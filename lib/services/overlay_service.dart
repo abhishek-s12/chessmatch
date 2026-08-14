@@ -1,9 +1,18 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+/// Service managing the native Android Floating Overlay and Screen Capture
 class OverlayService {
   static const MethodChannel _channel = MethodChannel('com.example.chess_engine_app/overlay');
 
+  static final StreamController<Map<String, dynamic>> _moveEventController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
+  /// Stream of live move detection events from the overlay
+  static Stream<Map<String, dynamic>> get onMoveDetected => _moveEventController.stream;
+
+  /// Check if the app has Android "Display over other apps" permission
   static Future<bool> checkPermission() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return true;
@@ -17,6 +26,7 @@ class OverlayService {
     }
   }
 
+  /// Open Android System Settings to grant "Display over other apps"
   static Future<bool> requestPermission() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return true;
@@ -30,6 +40,7 @@ class OverlayService {
     }
   }
 
+  /// Launch the Floating Assistant Bubble
   static Future<void> startOverlay() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       debugPrint('Floating overlay is an Android native feature');
@@ -42,6 +53,7 @@ class OverlayService {
     }
   }
 
+  /// Request Android MediaProjection Screen Capture permission
   static Future<bool> startScreenCapture() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return true;
@@ -55,6 +67,7 @@ class OverlayService {
     }
   }
 
+  /// Close and remove the Floating Assistant Bubble
   static Future<void> stopOverlay() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return;
@@ -66,6 +79,7 @@ class OverlayService {
     }
   }
 
+  /// Push an evaluation, best move, and depth to the Floating Overlay
   static Future<void> updateOverlay({
     required String eval,
     required String bestMove,
@@ -84,6 +98,22 @@ class OverlayService {
       });
     } catch (e) {
       debugPrint('Error updating overlay: $e');
+    }
+  }
+
+  /// Sync/Reset the match state to move 1
+  static Future<void> syncMatch({bool isWhite = true}) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+    try {
+      await updateOverlay(
+        eval: '+0.3',
+        bestMove: isWhite ? 'e4' : 'c5',
+        isWhite: isWhite,
+      );
+    } catch (e) {
+      debugPrint('Error syncing match state: $e');
     }
   }
 }
