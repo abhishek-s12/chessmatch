@@ -210,49 +210,55 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               const SizedBox(height: 12),
 
               // Board Control Toolbar
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildToolButton(
-                    icon: Icons.refresh,
-                    label: 'New Game',
-                    onTap: () {
-                      game.resetGame();
-                      _runEngineEvaluation();
-                    },
-                  ),
-                  _buildToolButton(
-                    icon: Icons.undo,
-                    label: 'Undo',
-                    onTap: () {
-                      game.undoMove();
-                      _runEngineEvaluation();
-                    },
-                  ),
-                  _buildToolButton(
-                    icon: Icons.lightbulb,
-                    label: 'Best Move',
-                    onTap: () {
-                      if (_currentEval.bestMove != '--') {
-                        final move = ChessMove.fromUci(_currentEval.bestMove);
-                        if (move != null) {
-                          game.makeMove(move);
-                          _runEngineEvaluation();
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildToolButton(
+                      icon: Icons.refresh,
+                      label: 'New Game',
+                      onTap: () {
+                        game.resetGame();
+                        _runEngineEvaluation();
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _buildToolButton(
+                      icon: Icons.undo,
+                      label: 'Undo',
+                      onTap: () {
+                        game.undoMove();
+                        _runEngineEvaluation();
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _buildToolButton(
+                      icon: Icons.lightbulb,
+                      label: 'Best Move',
+                      onTap: () {
+                        if (_currentEval.bestMove != '--') {
+                          final move = ChessMove.fromUci(_currentEval.bestMove);
+                          if (move != null) {
+                            game.makeMove(move);
+                            _runEngineEvaluation();
+                          }
                         }
-                      }
-                    },
-                  ),
-                  _buildToolButton(
-                    icon: Icons.insights,
-                    label: 'Review',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const GameReviewScreen()),
-                      );
-                    },
-                  ),
-                ],
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _buildToolButton(
+                      icon: Icons.insights,
+                      label: 'Review',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const GameReviewScreen()),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

@@ -37,52 +37,57 @@ class EngineAnalysisPanel extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isEngineActive ? AppTheme.secondaryNeon : AppTheme.textMuted,
-                      boxShadow: isEngineActive
-                          ? [
-                              BoxShadow(
-                                color: AppTheme.secondaryNeon.withOpacity(0.6),
-                                blurRadius: 6,
-                                spreadRadius: 1,
-                              )
-                            ]
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'STOCKFISH 16 MASTER',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'd=${evaluation.depth}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.primaryNeon,
-                        fontWeight: FontWeight.bold,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isEngineActive ? AppTheme.secondaryNeon : AppTheme.textMuted,
+                        boxShadow: isEngineActive
+                            ? [
+                                BoxShadow(
+                                  color: AppTheme.secondaryNeon.withOpacity(0.6),
+                                  blurRadius: 6,
+                                  spreadRadius: 1,
+                                )
+                              ]
+                            : null,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    const Flexible(
+                      child: Text(
+                        'STOCKFISH 16 MASTER',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'd=${evaluation.depth}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.primaryNeon,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 icon: Icon(
