@@ -1,9 +1,11 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/chess_game_state.dart';
 import '../models/chess_piece.dart';
 import '../services/sound_service.dart';
 import '../theme/app_theme.dart';
+import 'chess_piece_painter.dart';
 
 class ChessBoardWidget extends StatelessWidget {
   final String? bestMoveUci;
@@ -28,11 +30,11 @@ class ChessBoardWidget extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: boardTheme.borderColor.withOpacity(0.6), width: 3),
+          border: Border.all(color: boardTheme.borderColor, width: 3),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.6),
-              blurRadius: 20,
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 24,
               offset: const Offset(0, 10),
             ),
           ],
@@ -40,7 +42,7 @@ class ChessBoardWidget extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // 8x8 Squares Grid
+            // 8x8 Board Grid
             Column(
               children: List.generate(8, (displayRow) {
                 final actualRow = isFlipped ? 7 - displayRow : displayRow;
@@ -50,7 +52,15 @@ class ChessBoardWidget extends StatelessWidget {
                       final actualCol = isFlipped ? 7 - displayCol : displayCol;
                       final pos = BoardPosition(actualRow, actualCol);
                       return Expanded(
-                        child: _buildSquare(context, game, pos, displayRow, displayCol, boardTheme),
+                        child: _buildSquare(
+                          context,
+                          game,
+                          pos,
+                          displayRow,
+                          displayCol,
+                          isFlipped,
+                          boardTheme,
+                        ),
                       );
                     }),
                   ),
@@ -58,10 +68,7 @@ class ChessBoardWidget extends StatelessWidget {
               }),
             ),
 
-            // Rank and File Coordinate Indicators
-            _buildCoordinates(isFlipped),
-
-            // Best Move Arrow / Overlay Indicator
+            // Best Move Vector Arrow Overlay
             if (bestMoveUci != null && bestMoveUci!.length >= 4)
               _buildBestMoveOverlay(game, isFlipped, boardTheme.accentColor),
           ],
@@ -76,6 +83,7 @@ class ChessBoardWidget extends StatelessWidget {
     BoardPosition pos,
     int displayRow,
     int displayCol,
+    bool isFlipped,
     BoardThemeType theme,
   ) {
     final isLight = (pos.row + pos.col) % 2 == 0;
@@ -87,136 +95,119 @@ class ChessBoardWidget extends StatelessWidget {
         piece.color == game.turn &&
         game.isKingInCheck(game.turn);
 
-    // Background color
+    // Is this square the source or destination of the last move played?
+    final isLastMoveSource = game.moveHistory.isNotEmpty && game.moveHistory.last.from == pos;
+    final isLastMoveDest = game.moveHistory.isNotEmpty && game.moveHistory.last.to == pos;
+
+    // Coordinate displays (Top-Left of 'a' file squares, Bottom-Right of rank 1 squares)
+    final showRankLabel = isFlipped ? (displayCol == 7) : (displayCol == 0);
+    final showFileLabel = isFlipped ? (displayRow == 0) : (displayRow == 7);
+    final rankText = (isFlipped ? (pos.row + 1) : (8 - pos.row)).toString();
+    final fileText = String.fromCharCode('a'.codeUnitAt(0) + pos.col);
+    final coordColor = isLight ? theme.coordinateLight : theme.coordinateDark;
+
     Color squareColor = isLight ? theme.lightSquare : theme.darkSquare;
     if (isSelected) {
-      squareColor = theme.accentColor.withOpacity(0.65);
+      squareColor = theme.accentColor.withOpacity(0.60);
+    } else if (isLastMoveSource || isLastMoveDest) {
+      squareColor = theme.accentColor.withOpacity(0.35);
     } else if (isKingInCheck) {
-      squareColor = const Color(0xFF991B1B);
+      squareColor = const Color(0xFFDC2626);
     }
 
     return GestureDetector(
       onTap: !interactive
           ? null
           : () {
-              final selected = game.selectedSquare;
-              if (selected != null) {
-                final move = game.legalMovesForSelected.firstWhere(
-                  (m) => m.to == pos,
-                  orElse: () => const ChessMove(
-                    from: BoardPosition(-1, -1),
-                    to: BoardPosition(-1, -1),
-                  ),
-                );
-                if (move.from.row != -1) {
-                  final isCap = game.pieceAtPos(pos) != null || move.isEnPassant;
+              if (game.selectedSquare == null) {
+                if (piece != null && piece.color == game.turn) {
                   game.selectSquare(pos);
-                  if (isCap) {
-                    SoundService.playCapture();
-                  } else {
-                    SoundService.playMove();
-                  }
-                  if (game.isKingInCheck(game.turn)) {
-                    SoundService.playCheck();
-                  }
+                }
+              } else {
+                if (isLegalMoveTarget) {
+                  final move = game.legalMovesForSelected.firstWhere((m) => m.to == pos);
+                  game.makeMove(move);
+                  SoundService.playMoveSound(isCapture: move.isCapture, isCheck: game.isKingInCheck(game.turn));
                   onMoveMade?.call(move);
-                  return;
+                } else if (piece != null && piece.color == game.turn) {
+                  game.selectSquare(pos);
+                } else {
+                  game.clearSelection();
                 }
               }
-              game.selectSquare(pos);
             },
       child: Container(
         color: squareColor,
         child: Stack(
-          alignment: Alignment.center,
           children: [
-            // Legal move destination dot or capture ring
+            // Inside-Square Rank Coordinates
+            if (showRankLabel)
+              Positioned(
+                top: 2,
+                left: 3,
+                child: Text(
+                  rankText,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: coordColor.withOpacity(0.85),
+                  ),
+                ),
+              ),
+
+            // Inside-Square File Coordinates
+            if (showFileLabel)
+              Positioned(
+                bottom: 2,
+                right: 3,
+                child: Text(
+                  fileText,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: coordColor.withOpacity(0.85),
+                  ),
+                ),
+              ),
+
+            // Legal Move Target Indicators (Dot for empty, Ring for capture)
             if (isLegalMoveTarget)
-              Container(
-                width: piece != null ? 36 : 14,
-                height: piece != null ? 36 : 14,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: piece != null ? Colors.transparent : theme.accentColor.withOpacity(0.6),
-                  border: piece != null
-                      ? Border.all(color: theme.accentColor, width: 3)
-                      : null,
-                ),
+              Center(
+                child: piece == null
+                    ? Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: theme.accentColor.withOpacity(0.55),
+                          shape: BoxShape.circle,
+                        ),
+                      )
+                    : Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: theme.accentColor.withOpacity(0.80),
+                            width: 3.5,
+                          ),
+                        ),
+                      ),
               ),
 
-            // Piece symbol
+            // Staunton HD Vector Piece
             if (piece != null)
-              Text(
-                piece.symbol,
-                style: TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.bold,
-                  color: piece.color == PieceColor.white ? Colors.white : const Color(0xFF1E293B),
-                  shadows: [
-                    Shadow(
-                      color: piece.color == PieceColor.white
-                          ? theme.accentColor.withOpacity(0.7)
-                          : Colors.black.withOpacity(0.9),
-                      blurRadius: piece.color == PieceColor.white ? 8 : 4,
-                    ),
-                  ],
+              Center(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final pieceSize = constraints.maxWidth * 0.85;
+                    return ChessPieceWidget(
+                      piece: piece,
+                      size: pieceSize,
+                    );
+                  },
                 ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCoordinates(bool isFlipped) {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: Stack(
-          children: [
-            // File letters along bottom
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Row(
-                children: List.generate(8, (i) {
-                  final fileChar = String.fromCharCode('a'.codeUnitAt(0) + (isFlipped ? 7 - i : i));
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 3, bottom: 2),
-                      child: Text(
-                        fileChar,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textMuted.withOpacity(0.7),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-            // Rank numbers along left
-            Align(
-              alignment: Alignment.topLeft,
-              child: Column(
-                children: List.generate(8, (i) {
-                  final rankNum = (isFlipped ? i + 1 : 8 - i).toString();
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 3, top: 2),
-                      child: Text(
-                        rankNum,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textMuted.withOpacity(0.7),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
           ],
         ),
       ),
@@ -275,42 +266,57 @@ class _BestMoveArrowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withOpacity(0.85)
-      ..strokeWidth = 6
+    final dx = to.dx - from.dx;
+    final dy = to.dy - from.dy;
+    final distance = math.sqrt(dx * dx + dy * dy);
+    if (distance < 4) return;
+
+    final angle = math.atan2(dy, dx);
+    const arrowHeadLength = 16.0;
+
+    // Shorten end point slightly so arrow head sits right on target
+    final shortenedTo = Offset(
+      to.dx - math.cos(angle) * (arrowHeadLength * 0.4),
+      to.dy - math.sin(angle) * (arrowHeadLength * 0.4),
+    );
+
+    // Glowing shaft line
+    final glowPaint = Paint()
+      ..color = color.withOpacity(0.3)
+      ..strokeWidth = 10
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
+    canvas.drawLine(from, shortenedTo, glowPaint);
 
-    // Draw main shaft line
-    canvas.drawLine(from, to, paint);
+    final linePaint = Paint()
+      ..color = color.withOpacity(0.9)
+      ..strokeWidth = 5.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(from, shortenedTo, linePaint);
 
-    // Draw source ring
+    // Source ring
     final circlePaint = Paint()
-      ..color = color.withOpacity(0.5)
+      ..color = color.withOpacity(0.6)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(from, 8, circlePaint);
+    canvas.drawCircle(from, 7, circlePaint);
 
-    // Draw arrowhead at target
+    // Arrow head
     final arrowPaint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
 
-    final dx = to.dx - from.dx;
-    final dy = to.dy - from.dy;
-    final angle = (Offset(dx, dy).direction);
-
     final path = Path();
-    const arrowLength = 16.0;
-    const arrowWidth = 10.0;
+    const arrowWidth = 11.0;
 
     final p1 = to;
     final p2 = Offset(
-      to.dx - arrowLength * (Offset.fromDirection(angle).dx) + arrowWidth * (Offset.fromDirection(angle + 1.57).dx),
-      to.dy - arrowLength * (Offset.fromDirection(angle).dy) + arrowWidth * (Offset.fromDirection(angle + 1.57).dy),
+      to.dx - arrowHeadLength * math.cos(angle) + arrowWidth * math.cos(angle + math.pi / 2),
+      to.dy - arrowHeadLength * math.sin(angle) + arrowWidth * math.sin(angle + math.pi / 2),
     );
     final p3 = Offset(
-      to.dx - arrowLength * (Offset.fromDirection(angle).dx) - arrowWidth * (Offset.fromDirection(angle + 1.57).dx),
-      to.dy - arrowLength * (Offset.fromDirection(angle).dy) - arrowWidth * (Offset.fromDirection(angle + 1.57).dy),
+      to.dx - arrowHeadLength * math.cos(angle) - arrowWidth * math.cos(angle + math.pi / 2),
+      to.dy - arrowHeadLength * math.sin(angle) - arrowWidth * math.sin(angle + math.pi / 2),
     );
 
     path.moveTo(p1.dx, p1.dy);

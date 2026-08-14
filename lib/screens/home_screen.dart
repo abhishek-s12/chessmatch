@@ -15,11 +15,11 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // App Header & Branding
+              // Grandmaster Header & App Branding
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -28,34 +28,51 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          children: const [
-                            Icon(Icons.sports_esports, color: AppTheme.primaryNeon, size: 28),
-                            SizedBox(width: 8),
-                            Text(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [AppTheme.primaryNeon, Color(0xFF0284C7)],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.sports_esports, color: Colors.black, size: 20),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
                               'CHESSMATCH',
                               style: TextStyle(
-                                fontSize: 22,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 2,
+                                letterSpacing: 1.5,
                                 color: Colors.white,
                               ),
                             ),
-                            SizedBox(width: 6),
-                            Text(
-                              'v2.0',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.secondaryNeon,
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentGold.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppTheme.accentGold.withOpacity(0.5)),
+                              ),
+                              child: const Text(
+                                'PRO',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.accentGold,
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'AI Engine, Bot Matches, Game Review & Floating Overlay',
+                          'Stockfish AI • Game Review Coach • Floating Assistant',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: AppTheme.textMuted,
                             fontWeight: FontWeight.w500,
                           ),
@@ -64,7 +81,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.settings, color: AppTheme.textMuted),
+                    icon: const Icon(Icons.tune_outlined, color: AppTheme.textMuted),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -74,113 +91,91 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 18),
 
-              // Hero Feature 1: Play vs AI Bots
-              _buildFeatureCard(
-                context,
-                title: 'Play vs Engine Bots',
-                subtitle: 'Challenge 6 adaptive AI personalities (800 to 2600+ ELO) with chess clocks & takebacks.',
-                icon: Icons.smart_toy_outlined,
-                gradientColors: [const Color(0xFF0284C7), const Color(0xFF0369A1)],
-                accentColor: AppTheme.primaryNeon,
-                badgeText: 'BOT MATCHES',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const BotMatchScreen()),
-                  );
-                },
-              ),
+              // Hero Feature 1: Play vs Engine Bots (Large Feature Banner)
+              _buildHeroPlayBanner(context),
               const SizedBox(height: 14),
 
-              // Hero Feature 2: Post-Game Review & Move Analysis
-              _buildFeatureCard(
+              // Hero Feature 2: Post-Game Review Coach (Chess.com style)
+              _buildFeatureTile(
                 context,
-                title: 'Post-Game Review & Accuracies',
-                subtitle: 'Deep analysis with move classification (Brilliant, Best, Blunder) and eval graph.',
-                icon: Icons.insights_outlined,
-                gradientColors: [const Color(0xFF7C3AED), const Color(0xFF6D28D9)],
-                accentColor: AppTheme.accentPurple,
-                badgeText: 'GAME REVIEW',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const GameReviewScreen()),
-                  );
-                },
+                title: 'Game Review & Coach',
+                subtitle: 'Accuracies, move classifications (!!, !, ★, ??), and interactive eval timeline.',
+                badge: 'COACH',
+                badgeColor: AppTheme.brilliantCyan,
+                icon: Icons.psychology_outlined,
+                gradient: const [Color(0xFF0F766E), Color(0xFF115E59)],
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GameReviewScreen()),
+                ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
               // Hero Feature 3: Tactical Puzzle Trainer
-              _buildFeatureCard(
+              _buildFeatureTile(
                 context,
                 title: 'Tactical Puzzle Trainer',
-                subtitle: 'Sharpen your calculation with curated chess tactics (Mate in 1/2, Forks, Pins, Deflections).',
+                subtitle: 'Mate in 1/2, Forks, Pins, & Deflections with streak counter and rating progress.',
+                badge: 'TACTICS',
+                badgeColor: AppTheme.accentGold,
                 icon: Icons.extension_outlined,
-                gradientColors: [const Color(0xFFD97706), const Color(0xFFB45309)],
-                accentColor: Colors.amber,
-                badgeText: 'TACTICS DRILLS',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const PuzzleScreen()),
-                  );
-                },
+                gradient: const [Color(0xFFB45309), Color(0xFF92400E)],
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PuzzleScreen()),
+                ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-              // Hero Feature 4: Live Engine Analysis Board
-              _buildFeatureCard(
+              // Hero Feature 4: Live Engine Analyzer
+              _buildFeatureTile(
                 context,
                 title: 'Live Engine Analyzer',
-                subtitle: 'Analyze any position, calculate top engine lines, explore PV lines, and import/export FEN.',
+                subtitle: 'Deep position evaluation, PV lines, best move arrows, FEN/PGN import & export.',
+                badge: 'STOCKFISH',
+                badgeColor: AppTheme.secondaryNeon,
                 icon: Icons.analytics_outlined,
-                gradientColors: [const Color(0xFF059669), const Color(0xFF047857)],
-                accentColor: AppTheme.secondaryNeon,
-                badgeText: 'STOCKFISH 2.0',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AnalysisScreen()),
-                  );
-                },
+                gradient: const [Color(0xFF065F46), Color(0xFF064E3B)],
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AnalysisScreen()),
+                ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
               // Hero Feature 5: Floating Screen Overlay
-              _buildFeatureCard(
+              _buildFeatureTile(
                 context,
                 title: 'Floating Screen Overlay',
-                subtitle: 'Android floating pill assistant displaying live eval score and best move on top of third-party apps.',
+                subtitle: 'Live eval pill overlay on top of any third-party app with Stockfish calculations.',
+                badge: 'ANDROID',
+                badgeColor: AppTheme.primaryNeon,
                 icon: Icons.picture_in_picture_alt,
-                gradientColors: [const Color(0xFF475569), const Color(0xFF334155)],
-                accentColor: const Color(0xFF94A3B8),
-                badgeText: 'ANDROID OVERLAY',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const OverlayModeScreen()),
-                  );
-                },
+                gradient: const [Color(0xFF1E293B), Color(0xFF0F172A)],
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OverlayModeScreen()),
+                ),
               ),
               const SizedBox(height: 20),
 
               // Fair Play & Ethics Footer Banner
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: AppTheme.surfaceDark,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF334155)),
                 ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.shield_outlined, color: AppTheme.textMuted, size: 20),
+                child: const Row(
+                  children: [
+                    Icon(Icons.verified_user_outlined, color: AppTheme.textMuted, size: 18),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Designed for offline study, bot practice, and post-game review. Respect fair play guidelines across chess communities.',
+                        'Designed for offline study, engine practice, and post-game review. Respect fair play across all chess communities.',
                         style: TextStyle(fontSize: 11, color: AppTheme.textMuted, height: 1.3),
                       ),
                     ),
@@ -194,32 +189,32 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required List<Color> gradientColors,
-    required Color accentColor,
-    required String badgeText,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildHeroPlayBanner(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const BotMatchScreen()),
+          );
+        },
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.cardDark,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1E3A8A), Color(0xFF0F172A)],
+            ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: accentColor.withOpacity(0.4), width: 1.5),
+            border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: accentColor.withOpacity(0.12),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+                color: const Color(0xFF38BDF8).withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -230,48 +225,154 @@ class HomeScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: gradientColors),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(icon, color: Colors.white, size: 24),
-                  ),
-                  Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.15),
+                      color: AppTheme.primaryNeon.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: accentColor.withOpacity(0.5)),
+                      border: Border.all(color: AppTheme.primaryNeon.withOpacity(0.5)),
                     ),
-                    child: Text(
-                      badgeText,
+                    child: const Text(
+                      'FEATURED ARENA',
                       style: TextStyle(
-                        color: accentColor,
+                        color: AppTheme.primaryNeon,
                         fontSize: 10,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                         letterSpacing: 1,
                       ),
                     ),
                   ),
+                  const Icon(Icons.arrow_forward_ios, color: AppTheme.primaryNeon, size: 16),
                 ],
               ),
               const SizedBox(height: 14),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
+              const Text(
+                'Play vs Engine Bots',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white,
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textMuted,
-                  height: 1.4,
+              const Text(
+                'Challenge 6 adaptive AI bots (800 to 2600+ ELO) with live tournament clocks, takebacks, and hints.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF94A3B8),
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _buildBotChip('Novice 800'),
+                  const SizedBox(width: 6),
+                  _buildBotChip('Club 1600'),
+                  const SizedBox(width: 6),
+                  _buildBotChip('GM 2600+'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBotChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A).withOpacity(0.7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildFeatureTile(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required String badge,
+    required Color badgeColor,
+    required IconData icon,
+    required List<Color> gradient,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.cardDark,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF334155)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: gradient),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: badgeColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: badgeColor.withOpacity(0.4)),
+                          ),
+                          child: Text(
+                            badge,
+                            style: TextStyle(
+                              color: badgeColor,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

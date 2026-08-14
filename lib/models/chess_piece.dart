@@ -133,6 +133,8 @@ class ChessMove {
     this.isEnPassant = false,
   });
 
+  bool get isCapture => capturedPiece != null || isEnPassant;
+
   String get uci {
     final promo = promotion != null ? () {
       switch (promotion!) {

@@ -5,14 +5,15 @@ import 'opening_book_service.dart';
 import 'stockfish_engine_service.dart';
 
 enum MoveClassification {
-  brilliant(name: 'Brilliant', symbol: '!!', colorHex: 0xFF22D3EE),
-  best(name: 'Best', symbol: '!', colorHex: 0xFF10B981),
-  excellent(name: 'Excellent', symbol: '✓', colorHex: 0xFF3B82F6),
-  good(name: 'Good', symbol: '✓', colorHex: 0xFF60A5FA),
-  book(name: 'Book', symbol: '📖', colorHex: 0xFFA855F7),
-  inaccuracy(name: 'Inaccuracy', symbol: '?!', colorHex: 0xFFFBBF24),
-  mistake(name: 'Mistake', symbol: '?', colorHex: 0xFFF97316),
-  blunder(name: 'Blunder', symbol: '??', colorHex: 0xFFEF4444);
+  brilliant(name: 'Brilliant', symbol: '!!', colorHex: 0xFF1BACA6),
+  great(name: 'Great', symbol: '!', colorHex: 0xFF5C8BB0),
+  best(name: 'Best', symbol: '★', colorHex: 0xFF81B64C),
+  excellent(name: 'Excellent', symbol: '✓', colorHex: 0xFF96BC4B),
+  book(name: 'Book', symbol: '📖', colorHex: 0xFFC3996B),
+  inaccuracy(name: 'Inaccuracy', symbol: '?!', colorHex: 0xFFF7C631),
+  mistake(name: 'Mistake', symbol: '?', colorHex: 0xFFE6912C),
+  missedWin(name: 'Missed Win', symbol: '❌', colorHex: 0xFFDB5353),
+  blunder(name: 'Blunder', symbol: '??', colorHex: 0xFFFA412D);
 
   final String name;
   final String symbol;
@@ -123,38 +124,61 @@ class GameReviewService {
         explanation = 'Theoretical opening book line.';
       } else {
         final playedUci = move.uci;
-        if (playedUci == bestMoveUci) {
-          classification = MoveClassification.best;
-          explanation = 'The top computer engine move.';
-        } else {
-          final diff = isWhite ? (evalBefore.scoreCp - evalAfter.scoreCp) : (evalAfter.scoreCp - evalBefore.scoreCp);
+        final isTopEngine = playedUci == bestMoveUci;
+        final diff = isWhite ? (evalBefore.scoreCp - evalAfter.scoreCp) : (evalAfter.scoreCp - evalBefore.scoreCp);
+        final evalBeforeWinning = isWhite ? evalBefore.scoreCp > 3.0 : evalBefore.scoreCp < -3.0;
+        final evalAfterLost = isWhite ? evalAfter.scoreCp < 0.5 : evalAfter.scoreCp > -0.5;
 
-          if (diff <= 0.2) {
+        if (isTopEngine) {
+          // Check for brilliant sacrifice: moved a valuable piece into capture or sacrificed material
+          final movedPiece = tempGame.pieceAtPos(move.from);
+          final capturedPiece = tempGame.pieceAtPos(move.to);
+          final isSacrifice = movedPiece != null &&
+              (movedPiece.type == PieceType.queen || movedPiece.type == PieceType.rook || movedPiece.type == PieceType.bishop || movedPiece.type == PieceType.knight) &&
+              (capturedPiece == null || capturedPiece.value < movedPiece.value) &&
+              (isWhite ? evalAfter.scoreCp > 1.5 : evalAfter.scoreCp < -1.5);
+
+          if (isSacrifice) {
+            classification = MoveClassification.brilliant;
+            explanation = 'Brilliant sacrifice (!!)! You found the winning tactical sequence.';
+          } else if (diff < -0.4) {
+            classification = MoveClassification.great;
+            explanation = 'Great find (!). The only critical path to keep the advantage.';
+          } else {
+            classification = MoveClassification.best;
+            explanation = 'The engine\'s #1 best move (★).';
+          }
+        } else {
+          if (evalBeforeWinning && evalAfterLost && diff > 2.0) {
+            classification = MoveClassification.missedWin;
+            explanation = 'Missed win (❌). You had a winning advantage; $bestMoveUci won immediately.';
+          } else if (diff <= 0.25) {
             classification = MoveClassification.excellent;
-            explanation = 'A very solid move maintaining positional strength.';
-          } else if (diff <= 0.5) {
-            classification = MoveClassification.good;
-            explanation = 'A playable move, though $bestMoveUci was slightly more active.';
-          } else if (diff <= 1.2) {
+            explanation = 'An excellent move (✓) preserving positional control.';
+          } else if (diff <= 0.9) {
             classification = MoveClassification.inaccuracy;
-            explanation = 'An inaccuracy ($san). The engine favored $bestMoveUci.';
-          } else if (diff <= 2.5) {
+            explanation = 'An inaccuracy (?!). Engine preferred $bestMoveUci.';
+          } else if (diff <= 2.2) {
             classification = MoveClassification.mistake;
-            explanation = 'A notable mistake that concedes advantage to opponent.';
+            explanation = 'A mistake (?). Shifts the momentum towards your opponent.';
           } else {
             classification = MoveClassification.blunder;
-            explanation = 'A critical blunder ($san). $bestMoveUci was required.';
+            explanation = 'A serious blunder (??). $bestMoveUci was essential.';
           }
         }
       }
 
       // Calculate CAPS move accuracy (0% - 100%)
       double moveAccuracy = 100.0;
-      if (classification == MoveClassification.excellent) moveAccuracy = 95.0;
-      if (classification == MoveClassification.good) moveAccuracy = 85.0;
+      if (classification == MoveClassification.brilliant) moveAccuracy = 100.0;
+      if (classification == MoveClassification.great) moveAccuracy = 98.0;
+      if (classification == MoveClassification.best) moveAccuracy = 96.0;
+      if (classification == MoveClassification.excellent) moveAccuracy = 90.0;
+      if (classification == MoveClassification.book) moveAccuracy = 100.0;
       if (classification == MoveClassification.inaccuracy) moveAccuracy = 60.0;
-      if (classification == MoveClassification.mistake) moveAccuracy = 35.0;
-      if (classification == MoveClassification.blunder) moveAccuracy = 10.0;
+      if (classification == MoveClassification.mistake) moveAccuracy = 30.0;
+      if (classification == MoveClassification.missedWin) moveAccuracy = 15.0;
+      if (classification == MoveClassification.blunder) moveAccuracy = 5.0;
 
       if (isWhite) {
         whiteStats[classification] = (whiteStats[classification] ?? 0) + 1;

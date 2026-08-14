@@ -39,4 +39,14 @@ class SoundService {
       SystemSound.play(SystemSoundType.alert);
     }
   }
+
+  static void playMoveSound({bool isCapture = false, bool isCheck = false}) {
+    if (isCheck) {
+      playCheck();
+    } else if (isCapture) {
+      playCapture();
+    } else {
+      playMove();
+    }
+  }
 }

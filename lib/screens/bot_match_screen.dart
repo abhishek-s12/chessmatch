@@ -102,96 +102,89 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
       }
 
       final game = Provider.of<ChessGameState>(context, listen: false);
-      final isPlayerTurn = game.turn == _playerColor;
-
       setState(() {
-        if (isPlayerTurn) {
+        if (game.turn == _playerColor) {
           if (_playerTimeSeconds > 0) {
             _playerTimeSeconds--;
           } else {
-            _handleGameOver('Time Out! Bot won on time.');
+            _handleGameOver('Time out! Bot wins on time.');
           }
         } else {
           if (_botTimeSeconds > 0) {
             _botTimeSeconds--;
           } else {
-            _handleGameOver('Time Out! You won on time.');
+            _handleGameOver('Bot ran out of time! You win!');
           }
         }
       });
     });
   }
 
-  Future<void> _triggerBotMove() async {
-    final game = Provider.of<ChessGameState>(context, listen: false);
-    if (game.isCheckmate || game.isStalemate || _isGameOver) return;
-
-    setState(() {
-      _isBotThinking = true;
-      _hintMoveUci = null;
-    });
-
-    // Realistic bot human delay (600ms - 1500ms)
-    final delay = 600 + math.Random().nextInt(600);
-    await Future.delayed(Duration(milliseconds: delay));
-
-    if (!mounted || _isGameOver) return;
-
-    final botMove = await _engineService.getBotMove(game, _selectedBot);
-    final isCap = game.pieceAtPos(botMove.to) != null || botMove.isEnPassant;
-    game.makeMove(botMove);
-
-    if (isCap) {
-      SoundService.playCapture();
-    } else {
-      SoundService.playMove();
-    }
-    if (game.isKingInCheck(game.turn)) {
-      SoundService.playCheck();
-    }
-
-    if (_timeControl.increment > 0) {
-      _botTimeSeconds += _timeControl.increment;
-    }
-
-    if (mounted) {
-      setState(() {
-        _isBotThinking = false;
-      });
-      _checkGameEndCondition();
-    }
-  }
-
   void _onPlayerMoveMade(ChessMove move) {
     setState(() {
       _hintMoveUci = null;
+      if (_timeControl != TimeControlMode.untimed && _timeControl.increment > 0) {
+        _playerTimeSeconds += _timeControl.increment;
+      }
     });
 
-    if (_timeControl.increment > 0) {
-      _playerTimeSeconds += _timeControl.increment;
-    }
-
-    if (!_checkGameEndCondition()) {
-      _triggerBotMove();
-    }
-  }
-
-  bool _checkGameEndCondition() {
     final game = Provider.of<ChessGameState>(context, listen: false);
     if (game.isCheckmate) {
-      final winner = game.turn == _playerColor ? 'Bot' : 'You';
-      _handleGameOver('Checkmate! $winner won the match.');
-      return true;
+      _handleGameOver('Checkmate! You won against ${_selectedBot.name}!');
+      return;
     } else if (game.isStalemate) {
-      _handleGameOver('Draw by Stalemate!');
-      return true;
+      _handleGameOver('Stalemate! The match is drawn.');
+      return;
     }
-    return false;
+
+    _triggerBotMove();
+  }
+
+  void _triggerBotMove() async {
+    final game = Provider.of<ChessGameState>(context, listen: false);
+    if (_isGameOver || game.turn == _playerColor) return;
+
+    setState(() {
+      _isBotThinking = true;
+    });
+
+    // Human-like response delay (600ms - 1500ms)
+    final delayMs = 600 + math.Random().nextInt(700);
+    await Future.delayed(Duration(milliseconds: delayMs));
+
+    if (!mounted || _isGameOver) return;
+
+    final botMove = await _engineService.getBestMoveForBot(game, _selectedBot);
+
+    if (mounted && botMove != null && !_isGameOver) {
+      final legalMoves = game.generateAllLegalMoves();
+      final move = legalMoves.firstWhere(
+        (m) => m.uci == botMove,
+        orElse: () => legalMoves.first,
+      );
+
+      game.makeMove(move);
+      SoundService.playMoveSound(isCapture: move.isCapture, isCheck: game.isKingInCheck(game.turn));
+
+      setState(() {
+        _isBotThinking = false;
+        if (_timeControl != TimeControlMode.untimed && _timeControl.increment > 0) {
+          _botTimeSeconds += _timeControl.increment;
+        }
+      });
+
+      if (game.isCheckmate) {
+        _handleGameOver('Checkmate! ${_selectedBot.name} wins.');
+      } else if (game.isStalemate) {
+        _handleGameOver('Stalemate! The game ended in a draw.');
+      }
+    } else {
+      if (mounted) setState(() => _isBotThinking = false);
+    }
   }
 
   void _handleGameOver(String reason) {
     _clockTimer?.cancel();
-    SoundService.playGameOver();
     setState(() {
       _isGameOver = true;
       _gameOverReason = reason;
@@ -204,11 +197,11 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.cardDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.emoji_events, color: AppTheme.primaryNeon, size: 28),
-            const SizedBox(width: 10),
-            const Text('Game Finished', style: TextStyle(fontWeight: FontWeight.bold)),
+            Icon(Icons.emoji_events, color: AppTheme.primaryNeon, size: 28),
+            SizedBox(width: 10),
+            Text('Game Finished', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
@@ -300,49 +293,107 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
     if (!_gameStarted) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('PLAY VS ENGINE BOTS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          title: const Text('Play vs Engine Bots', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         ),
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              // Bot Difficulty Selection
-              const Text('Select Bot Difficulty', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              // Bot Personality Cards
+              const Text('Choose Your Opponent', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
               ...BotDifficulty.values.map((bot) {
                 final isSel = _selectedBot == bot;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    tileColor: isSel ? AppTheme.surfaceDark : AppTheme.cardDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(
-                        color: isSel ? AppTheme.primaryNeon : const Color(0xFF334155),
-                        width: isSel ? 2 : 1,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => setState(() => _selectedBot = bot),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isSel ? AppTheme.surfaceDark : AppTheme.cardDark,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSel ? AppTheme.primaryNeon : const Color(0xFF334155),
+                            width: isSel ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isSel ? AppTheme.primaryNeon.withOpacity(0.2) : const Color(0xFF0F172A),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSel ? AppTheme.primaryNeon : const Color(0xFF334155),
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.smart_toy_outlined,
+                                color: isSel ? AppTheme.primaryNeon : Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        bot.name,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.accentGold.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'Depth ${bot.depth}',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.accentGold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Blunder rate: ${(bot.blunderRate * 100).toInt()}% • Tactical evaluation',
+                                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isSel)
+                              const Icon(Icons.check_circle, color: AppTheme.primaryNeon, size: 22),
+                          ],
+                        ),
                       ),
                     ),
-                    leading: CircleAvatar(
-                      backgroundColor: isSel ? AppTheme.primaryNeon : const Color(0xFF334155),
-                      child: Icon(Icons.smart_toy, color: isSel ? Colors.black : Colors.white),
-                    ),
-                    title: Text(bot.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('Minimax Depth ${bot.depth} • Blunder ${(bot.blunderRate * 100).toInt()}%'),
-                    trailing: isSel ? const Icon(Icons.check_circle, color: AppTheme.primaryNeon) : null,
-                    onTap: () => setState(() => _selectedBot = bot),
                   ),
                 );
               }),
 
               const SizedBox(height: 16),
               // Play As Side
-              const Text('Play As Side', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text('Play As', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: _buildSideSelector(
-                      title: 'White',
+                      title: 'White (First)',
                       icon: Icons.circle,
                       iconColor: Colors.white,
                       isSelected: _playerColor == PieceColor.white,
@@ -352,9 +403,9 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildSideSelector(
-                      title: 'Black',
+                      title: 'Black (Second)',
                       icon: Icons.circle,
-                      iconColor: Colors.black,
+                      iconColor: const Color(0xFF1E293B),
                       isSelected: _playerColor == PieceColor.black,
                       onTap: () => setState(() => _playerColor = PieceColor.black),
                     ),
@@ -362,7 +413,7 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               // Time Controls
               const Text('Time Control', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 10),
@@ -374,142 +425,123 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
                   return ChoiceChip(
                     label: Text(tc.name),
                     selected: isSel,
-                    selectedColor: AppTheme.secondaryNeon.withOpacity(0.3),
+                    selectedColor: AppTheme.primaryNeon.withOpacity(0.25),
                     backgroundColor: AppTheme.cardDark,
+                    side: BorderSide(color: isSel ? AppTheme.primaryNeon : const Color(0xFF334155)),
                     labelStyle: TextStyle(
-                      color: isSel ? AppTheme.secondaryNeon : Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    side: BorderSide(
-                      color: isSel ? AppTheme.secondaryNeon : const Color(0xFF334155),
+                      color: isSel ? AppTheme.primaryNeon : Colors.white,
+                      fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
                     ),
                     onSelected: (_) => setState(() => _timeControl = tc),
                   );
                 }).toList(),
               ),
 
-              const SizedBox(height: 28),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryNeon,
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              const SizedBox(height: 32),
+              // Launch Match Button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryNeon,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.play_arrow, size: 28),
+                  label: const Text(
+                    'START BOT MATCH',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1),
+                  ),
+                  onPressed: _startNewGame,
                 ),
-                icon: const Icon(Icons.play_arrow, size: 26),
-                label: const Text(
-                  'START BOT MATCH',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                ),
-                onPressed: _startNewGame,
               ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
       );
     }
 
-    // Active Bot Match Screen
+    // Active Live Bot Match View
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'VS ${_selectedBot.name.toUpperCase()}',
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 1),
+          'Vs ${_selectedBot.name}',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'New Match Setup',
-            onPressed: () {
-              setState(() {
-                _gameStarted = false;
-                _clockTimer?.cancel();
-              });
-            },
+            tooltip: 'New Game',
+            onPressed: _startNewGame,
           ),
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            children: [
-              // Top Player Card (Bot)
-              _buildPlayerCard(
-                name: _selectedBot.name,
-                isBot: true,
-                isActive: !isPlayerTurn && !_isGameOver,
-                timeText: _timeControl == TimeControlMode.untimed ? '∞' : _formatTime(_botTimeSeconds),
-                isThinking: _isBotThinking,
-              ),
-              const SizedBox(height: 8),
+        child: Column(
+          children: [
+            // Opponent Bot Header
+            _buildPlayerHeader(
+              name: _selectedBot.name,
+              isBot: true,
+              isTurn: !isPlayerTurn && !_isGameOver,
+              timeFormatted: _formatTime(_botTimeSeconds),
+              timeSeconds: _botTimeSeconds,
+              isThinking: _isBotThinking,
+            ),
 
-              // Interactive Chess Board
-              ChessBoardWidget(
-                bestMoveUci: _hintMoveUci,
-                interactive: isPlayerTurn && !_isBotThinking && !_isGameOver,
-                onMoveMade: _onPlayerMoveMade,
-              ),
-              const SizedBox(height: 8),
-
-              // Bottom Player Card (User)
-              _buildPlayerCard(
-                name: 'You (${_playerColor == PieceColor.white ? "White" : "Black"})',
-                isBot: false,
-                isActive: isPlayerTurn && !_isGameOver,
-                timeText: _timeControl == TimeControlMode.untimed ? '∞' : _formatTime(_playerTimeSeconds),
-                isThinking: false,
-              ),
-              const SizedBox(height: 10),
-
-              // Move History
-              MoveHistoryWidget(sanHistory: game.sanHistory),
-              const SizedBox(height: 12),
-
-              // Controls Action Bar
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildActionButton(
-                    icon: Icons.undo,
-                    label: 'Takeback',
-                    onTap: _undoMove,
+            // Chess Board
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: ChessBoardWidget(
+                    bestMoveUci: _hintMoveUci,
+                    onMoveMade: _onPlayerMoveMade,
+                    interactive: isPlayerTurn && !_isGameOver && !_isBotThinking,
                   ),
-                  _buildActionButton(
-                    icon: Icons.lightbulb,
-                    label: 'Hint',
-                    onTap: _requestHint,
-                  ),
-                  _buildActionButton(
-                    icon: Icons.flag,
-                    label: 'Resign',
-                    color: AppTheme.alertRed,
-                    onTap: _resignGame,
-                  ),
-                ],
+                ),
               ),
-            ],
-          ),
+            ),
+
+            // Human Player Header
+            _buildPlayerHeader(
+              name: 'You (${_playerColor == PieceColor.white ? "White" : "Black"})',
+              isBot: false,
+              isTurn: isPlayerTurn && !_isGameOver,
+              timeFormatted: _formatTime(_playerTimeSeconds),
+              timeSeconds: _playerTimeSeconds,
+              isThinking: false,
+            ),
+
+            // Bottom In-Game Controls
+            _buildControlBar(context, isPlayerTurn),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildPlayerCard({
+  Widget _buildPlayerHeader({
     required String name,
     required bool isBot,
-    required bool isActive,
-    required String timeText,
+    required bool isTurn,
+    required String timeFormatted,
+    required int timeSeconds,
     required bool isThinking,
   }) {
+    final isLowTime = timeSeconds > 0 && timeSeconds <= 30;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
-        color: isActive ? AppTheme.surfaceDark : AppTheme.cardDark,
+        color: isTurn ? AppTheme.surfaceDark : AppTheme.cardDark,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isActive ? AppTheme.primaryNeon : const Color(0xFF334155),
-          width: isActive ? 1.5 : 1,
+          color: isTurn ? AppTheme.primaryNeon.withOpacity(0.6) : const Color(0xFF334155),
+          width: isTurn ? 1.5 : 1,
         ),
       ),
       child: Row(
@@ -518,9 +550,13 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
           Row(
             children: [
               CircleAvatar(
-                radius: 18,
-                backgroundColor: isBot ? const Color(0xFF3B82F6) : AppTheme.secondaryNeon,
-                child: Icon(isBot ? Icons.smart_toy : Icons.person, color: Colors.black, size: 20),
+                radius: 16,
+                backgroundColor: isBot ? AppTheme.accentPurple : AppTheme.primaryNeon,
+                child: Icon(
+                  isBot ? Icons.smart_toy : Icons.person,
+                  size: 18,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 10),
               Column(
@@ -534,42 +570,124 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
                     const Row(
                       children: [
                         SizedBox(
-                          width: 10,
-                          height: 10,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryNeon),
+                          width: 8,
+                          height: 8,
+                          child: CircularProgressIndicator(strokeWidth: 1.5, color: AppTheme.secondaryNeon),
                         ),
                         SizedBox(width: 6),
-                        Text('Thinking...', style: TextStyle(fontSize: 11, color: AppTheme.primaryNeon)),
+                        Text(
+                          'Calculating move...',
+                          style: TextStyle(fontSize: 10, color: AppTheme.secondaryNeon),
+                        ),
                       ],
                     ),
                 ],
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isActive ? Colors.black : const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: isActive ? AppTheme.primaryNeon : const Color(0xFF334155)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.timer_outlined, size: 16, color: AppTheme.primaryNeon),
-                const SizedBox(width: 4),
-                Text(
-                  timeText,
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: isActive ? Colors.white : AppTheme.textMuted,
-                  ),
+
+          // Digital Tournament Clock
+          if (_timeControl != TimeControlMode.untimed)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: isLowTime ? const Color(0xFF7F1D1D) : const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isLowTime ? AppTheme.alertRed : const Color(0xFF334155),
                 ),
-              ],
+              ),
+              child: Text(
+                timeFormatted,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: isLowTime ? Colors.white : (isTurn ? AppTheme.primaryNeon : AppTheme.textMuted),
+                ),
+              ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlBar(BuildContext context, bool isPlayerTurn) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        color: AppTheme.surfaceDark,
+        border: Border(top: BorderSide(color: Color(0xFF334155))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildActionButton(
+            icon: Icons.undo,
+            label: 'Takeback',
+            onTap: _undoMove,
+          ),
+          _buildActionButton(
+            icon: Icons.lightbulb_outline,
+            label: 'Hint',
+            color: AppTheme.accentGold,
+            onTap: isPlayerTurn && !_isGameOver ? _requestHint : null,
+          ),
+          _buildActionButton(
+            icon: Icons.history,
+            label: 'Moves',
+            onTap: () {
+              final game = Provider.of<ChessGameState>(context, listen: false);
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: AppTheme.cardDark,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (_) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: MoveHistoryWidget(sanHistory: game.sanHistory),
+                ),
+              );
+            },
+          ),
+          _buildActionButton(
+            icon: Icons.flag_outlined,
+            label: 'Resign',
+            color: AppTheme.alertRed,
+            onTap: !_isGameOver ? _resignGame : null,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    Color color = AppTheme.textMuted,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: onTap != null ? color : const Color(0xFF475569), size: 22),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: onTap != null ? color : const Color(0xFF475569),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -583,52 +701,23 @@ class _BotMatchScreenState extends State<BotMatchScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.surfaceDark : AppTheme.cardDark,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppTheme.primaryNeon : const Color(0xFF334155),
             width: isSelected ? 2 : 1,
           ),
         ),
-        child: Column(
-          children: [
-            Icon(icon, color: iconColor, size: 28),
-            const SizedBox(height: 6),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    Color color = AppTheme.primaryNeon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppTheme.cardDark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF334155)),
-        ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color == AppTheme.alertRed ? color : Colors.white),
-            ),
+            Icon(icon, color: iconColor, size: 18),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           ],
         ),
       ),

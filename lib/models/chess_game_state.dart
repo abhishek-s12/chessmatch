@@ -582,6 +582,12 @@ class ChessGameState extends ChangeNotifier {
     return true;
   }
 
+  void clearSelection() {
+    _selectedSquare = null;
+    _legalMovesForSelected = [];
+    notifyListeners();
+  }
+
   /// Reverts two consecutive moves (e.g. player's move + engine's reply)
   bool undoTwoMoves() {
     if (_fenHistory.length > 2) {

@@ -385,6 +385,14 @@ class StockfishEngineService {
     return moves.first;
   }
 
+  Future<ChessMove> calculateBotMove(ChessGameState game, BotDifficulty difficulty) =>
+      getBotMove(game, difficulty);
+
+  Future<String?> getBestMoveForBot(ChessGameState game, BotDifficulty difficulty) async {
+    final move = await getBotMove(game, difficulty);
+    return move.uci;
+  }
+
   int _minimax(ChessGameState game, int depth, int alpha, int beta, bool isMaximizing) {
     if (depth == 0) {
       return _quiescence(game, alpha, beta, isMaximizing, 2);
