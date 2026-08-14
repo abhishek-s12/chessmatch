@@ -42,14 +42,15 @@ class FloatingOverlayService : Service() {
     private var floatingView: View? = null
     private var evalBadge: TextView? = null
     private var moveTextView: TextView? = null
-    private var depthTextView: TextView? = null
+    private var pieceIconBadge: TextView? = null
+    private var squareRouteBadge: TextView? = null
     private var colorBadge: TextView? = null
     private var syncBtn: TextView? = null
+    private var nextBtn: TextView? = null
     private var liveBadge: TextView? = null
     private var closeBtn: TextView? = null
 
     private var isPlayerWhite = true
-    private var isExpanded = false
     private var isReceiverRegistered = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -78,10 +79,8 @@ class FloatingOverlayService : Service() {
             if (intent?.action == "com.example.chess_engine_app.UPDATE_EVAL") {
                 val eval = intent.getStringExtra("eval") ?: "+0.0"
                 val bestMove = intent.getStringExtra("bestMove") ?: "--"
-                val depth = intent.getIntExtra("depth", 12)
-
                 mainHandler.post {
-                    updateOverlayUI(eval, bestMove, "D$depth")
+                    updateOverlayUI(eval, bestMove, "e2", "e4", "Pawn")
                 }
             }
         }
@@ -189,9 +188,9 @@ class FloatingOverlayService : Service() {
             startContinuousMoveTracking()
 
             mainHandler.post {
-                liveBadge?.setTextColor(Color.parseColor("#22C55E")) // Green = Active Live
+                liveBadge?.setTextColor(Color.parseColor("#22C55E"))
                 val firstMove = liveGameState.getBestMoveFor(isPlayerWhite)
-                updateOverlayUI(firstMove.score, firstMove.moveSan, "GM Engine")
+                updateOverlayUI(firstMove.score, firstMove.moveSan, firstMove.fromSquare, firstMove.toSquare, firstMove.pieceName)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -218,7 +217,7 @@ class FloatingOverlayService : Service() {
                 }
 
                 if (autoDetectRunning) {
-                    backgroundHandler?.postDelayed(this, 500) // Fast 500ms radar loop
+                    backgroundHandler?.postDelayed(this, 500)
                 }
             }
         })
@@ -235,7 +234,7 @@ class FloatingOverlayService : Service() {
 
             val response = liveGameState.getBestMoveFor(isPlayerWhite)
             mainHandler.post {
-                updateOverlayUI(response.score, response.moveSan, "Live")
+                updateOverlayUI(response.score, response.moveSan, response.fromSquare, response.toSquare, response.pieceName)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -249,7 +248,15 @@ class FloatingOverlayService : Service() {
         lastObservedSignature = 0L
         mainHandler.post {
             val start = liveGameState.getBestMoveFor(isPlayerWhite)
-            updateOverlayUI(start.score, start.moveSan, "Synced")
+            updateOverlayUI(start.score, start.moveSan, start.fromSquare, start.toSquare, start.pieceName)
+        }
+    }
+
+    private fun advanceToNextMove() {
+        liveGameState.advanceNextMove(isPlayerWhite)
+        val next = liveGameState.getBestMoveFor(isPlayerWhite)
+        mainHandler.post {
+            updateOverlayUI(next.score, next.moveSan, next.fromSquare, next.toSquare, next.pieceName)
         }
     }
 
@@ -259,7 +266,7 @@ class FloatingOverlayService : Service() {
         mainHandler.post {
             updateColorBadgeUI()
             val next = liveGameState.getBestMoveFor(isPlayerWhite)
-            updateOverlayUI(next.score, next.moveSan, "Live")
+            updateOverlayUI(next.score, next.moveSan, next.fromSquare, next.toSquare, next.pieceName)
         }
     }
 
@@ -269,25 +276,36 @@ class FloatingOverlayService : Service() {
             badge.setTextColor(if (isPlayerWhite) Color.parseColor("#0F172A") else Color.WHITE)
             val bg = GradientDrawable().apply {
                 setColor(if (isPlayerWhite) Color.WHITE else Color.parseColor("#1E293B"))
-                cornerRadius = 20f
+                cornerRadius = 16f
                 setStroke(2, if (isPlayerWhite) Color.parseColor("#E2E8F0") else Color.parseColor("#475569"))
             }
             badge.background = bg
         }
     }
 
-    private fun updateOverlayUI(eval: String, move: String, depth: String) {
+    private fun updateOverlayUI(eval: String, moveSan: String, fromSq: String, toSq: String, pieceName: String) {
         try {
             evalBadge?.text = eval
-            moveTextView?.text = move
-            depthTextView?.text = depth
+
+            // Full clear piece icon & name
+            val pieceIcon = when (pieceName) {
+                "Knight" -> "♞"
+                "Bishop" -> "♝"
+                "Rook" -> "♜"
+                "Queen" -> "♛"
+                "King" -> "♚"
+                else -> "♙"
+            }
+            pieceIconBadge?.text = "$pieceIcon $pieceName"
+            squareRouteBadge?.text = "$fromSq ➔ $toSq"
+            moveTextView?.text = moveSan
 
             val isAdvantage = eval.startsWith("+") || (!eval.startsWith("-") && eval != "0.0")
             evalBadge?.setTextColor(if (isAdvantage) Color.parseColor("#4ADE80") else Color.parseColor("#F87171"))
 
             val evalBg = GradientDrawable().apply {
                 setColor(if (isAdvantage) Color.parseColor("#2022C55E") else Color.parseColor("#20EF4444"))
-                cornerRadius = 16f
+                cornerRadius = 14f
                 setStroke(1, if (isAdvantage) Color.parseColor("#4022C55E") else Color.parseColor("#40EF4444"))
             }
             evalBadge?.background = evalBg
@@ -315,8 +333,8 @@ class FloatingOverlayService : Service() {
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                x = 40
-                y = 140
+                x = 30
+                y = 120
             }
 
             // High-End Luxury Glass Container
@@ -326,41 +344,59 @@ class FloatingOverlayService : Service() {
                 setPadding(16, 8, 16, 8)
 
                 val bg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#F4090D16")) // Deep midnight frosted glass
-                    cornerRadius = 36f
+                    setColor(Color.parseColor("#F6080C14")) // Ultra dark sleek glass
+                    cornerRadius = 34f
                     setStroke(2, Color.parseColor("#38BDF8")) // Electric Cyan Border
                 }
                 background = bg
                 elevation = 32f
             }
 
-            // ♔ W / ♚ B Styled Player Badge
+            // ♔ W / ♚ B Styled Player Perspective Badge
             colorBadge = TextView(this).apply {
                 text = "♔ W"
                 textSize = 12f
                 paint.isFakeBoldText = true
-                setPadding(14, 6, 14, 6)
+                setPadding(12, 6, 12, 6)
                 setOnClickListener {
                     togglePlayerColor()
                 }
             }
             updateColorBadgeUI()
 
-            // ↻ SYNC Pill Button
+            // ↻ SYNC Button
             syncBtn = TextView(this).apply {
                 text = "↻ SYNC"
                 setTextColor(Color.parseColor("#38BDF8"))
                 textSize = 11f
                 paint.isFakeBoldText = true
-                setPadding(12, 6, 12, 6)
+                setPadding(10, 6, 10, 6)
                 val syncBg = GradientDrawable().apply {
                     setColor(Color.parseColor("#1A38BDF8"))
-                    cornerRadius = 16f
+                    cornerRadius = 14f
                     setStroke(1, Color.parseColor("#4038BDF8"))
                 }
                 background = syncBg
                 setOnClickListener {
                     resetAndSyncGame()
+                }
+            }
+
+            // ▶ NEXT Button (Manual Advance if ever needed)
+            nextBtn = TextView(this).apply {
+                text = "▶ NEXT"
+                setTextColor(Color.parseColor("#A855F7"))
+                textSize = 11f
+                paint.isFakeBoldText = true
+                setPadding(10, 6, 10, 6)
+                val nextBg = GradientDrawable().apply {
+                    setColor(Color.parseColor("#1AA855F7"))
+                    cornerRadius = 14f
+                    setStroke(1, Color.parseColor("#40A855F7"))
+                }
+                background = nextBg
+                setOnClickListener {
+                    advanceToNextMove()
                 }
             }
 
@@ -370,37 +406,46 @@ class FloatingOverlayService : Service() {
                 setTextColor(Color.parseColor("#22C55E"))
                 textSize = 10f
                 paint.isFakeBoldText = true
-                setPadding(10, 0, 8, 0)
+                setPadding(8, 0, 8, 0)
                 setOnClickListener {
                     inspectScreenForMove(latestBitmap ?: return@setOnClickListener)
                 }
             }
 
-            // Score Pill Badge (+0.4 / -1.2)
+            // Centipawn Evaluation Badge
             evalBadge = TextView(this).apply {
                 text = "+0.3"
                 setTextColor(Color.parseColor("#4ADE80"))
                 textSize = 13f
                 paint.isFakeBoldText = true
-                setPadding(12, 5, 12, 5)
+                setPadding(10, 4, 10, 4)
             }
 
-            // Grandmaster Best Move Display
-            moveTextView = TextView(this).apply {
-                text = "e4"
-                setTextColor(Color.WHITE)
-                textSize = 15f
+            // Piece Icon & Name Badge (e.g. ♙ Pawn, ♞ Knight)
+            pieceIconBadge = TextView(this).apply {
+                text = "♙ Pawn"
+                setTextColor(Color.parseColor("#E2E8F0"))
+                textSize = 13f
                 paint.isFakeBoldText = true
-                setPadding(10, 0, 4, 0)
+                setPadding(8, 0, 4, 0)
             }
 
-            // Depth Tag
-            depthTextView = TextView(this).apply {
-                text = "D12"
+            // Exact From-To Square Route (e.g. e2 ➔ e4)
+            squareRouteBadge = TextView(this).apply {
+                text = "e2 ➔ e4"
+                setTextColor(Color.parseColor("#38BDF8"))
+                textSize = 14f
+                paint.isFakeBoldText = true
+                setPadding(4, 0, 4, 0)
+            }
+
+            // SAN Move Notation (e.g. e4, Nf3)
+            moveTextView = TextView(this).apply {
+                text = "(e4)"
                 setTextColor(Color.parseColor("#94A3B8"))
-                textSize = 10f
-                visibility = View.GONE
-                setPadding(6, 0, 0, 0)
+                textSize = 13f
+                paint.isFakeBoldText = true
+                setPadding(4, 0, 4, 0)
             }
 
             // Sleek Close Button
@@ -409,35 +454,38 @@ class FloatingOverlayService : Service() {
                 setTextColor(Color.parseColor("#94A3B8"))
                 textSize = 13f
                 paint.isFakeBoldText = true
-                setPadding(10, 0, 4, 0)
+                setPadding(8, 0, 4, 0)
                 setOnClickListener {
                     stopSelf()
                 }
             }
 
-            val space1 = View(this).apply { layoutParams = LinearLayout.LayoutParams(10, 1) }
+            val space1 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
             val space2 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
             val space3 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
+            val space4 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
 
             container.addView(colorBadge)
             container.addView(space1)
             container.addView(syncBtn)
             container.addView(space2)
-            container.addView(liveBadge)
+            container.addView(nextBtn)
             container.addView(space3)
+            container.addView(liveBadge)
+            container.addView(space4)
             container.addView(evalBadge)
+            container.addView(pieceIconBadge)
+            container.addView(squareRouteBadge)
             container.addView(moveTextView)
-            container.addView(depthTextView)
             container.addView(closeBtn)
             floatingView = container
 
-            // Smooth Dragging & Expansion
+            // Smooth Dragging
             container.setOnTouchListener(object : View.OnTouchListener {
                 private var initialX = 0
                 private var initialY = 0
                 private var initialTouchX = 0f
                 private var initialTouchY = 0f
-                private var isClick = false
 
                 override fun onTouch(v: View?, event: MotionEvent?): Boolean {
                     if (event == null) return false
@@ -447,14 +495,12 @@ class FloatingOverlayService : Service() {
                             initialY = params.y
                             initialTouchX = event.rawX
                             initialTouchY = event.rawY
-                            isClick = true
                             return false
                         }
                         MotionEvent.ACTION_MOVE -> {
                             val dx = (event.rawX - initialTouchX).toInt()
                             val dy = (event.rawY - initialTouchY).toInt()
                             if (abs(dx) > 10 || abs(dy) > 10) {
-                                isClick = false
                                 params.x = initialX + dx
                                 params.y = initialY + dy
                                 try {
@@ -463,12 +509,6 @@ class FloatingOverlayService : Service() {
                                     e.printStackTrace()
                                 }
                                 return true
-                            }
-                        }
-                        MotionEvent.ACTION_UP -> {
-                            if (isClick && event.rawX > (initialTouchX + 160)) {
-                                isExpanded = !isExpanded
-                                depthTextView?.visibility = if (isExpanded) View.VISIBLE else View.GONE
                             }
                         }
                     }
@@ -632,17 +672,23 @@ object ChessHighlightTracker {
  */
 class LiveChessMatchTracker {
 
-    data class MoveCandidate(val moveSan: String, val score: String)
+    data class MoveCandidate(
+        val moveSan: String,
+        val fromSquare: String,
+        val toSquare: String,
+        val pieceName: String,
+        val score: String
+    )
 
     private val board = Array(8) { CharArray(8) { ' ' } }
-    private var moveCount = 0
+    private var moveIndex = 0
 
     init {
         resetToStartingPosition()
     }
 
     fun resetToStartingPosition() {
-        moveCount = 0
+        moveIndex = 0
         val initial = arrayOf(
             "rnbqkbnr",
             "pppppppp",
@@ -667,18 +713,35 @@ class LiveChessMatchTracker {
         if (p1 != ' ') {
             board[move.fromR][move.fromC] = ' '
             board[move.toR][move.toC] = p1
-            moveCount++
+            moveIndex++
         } else if (p2 != ' ') {
             board[move.toR][move.toC] = ' '
             board[move.fromR][move.fromC] = p2
-            moveCount++
+            moveIndex++
+        }
+    }
+
+    fun advanceNextMove(isWhite: Boolean) {
+        val best = getBestMoveFor(isWhite)
+        // Find and execute the move
+        val legalMoves = generateLegalMoves(board, isWhite)
+        val targetMove = legalMoves.find { it.san == best.moveSan }
+        if (targetMove != null) {
+            val p = board[targetMove.fromR][targetMove.fromC]
+            board[targetMove.fromR][targetMove.fromC] = ' '
+            board[targetMove.toR][targetMove.toC] = p
+            moveIndex++
         }
     }
 
     fun getBestMoveFor(isWhite: Boolean): MoveCandidate {
         val legalMoves = generateLegalMoves(board, isWhite)
         if (legalMoves.isEmpty()) {
-            return MoveCandidate(if (isWhite) "e4" else "c5", "+0.3")
+            return if (isWhite) {
+                MoveCandidate("e4", "e2", "e4", "Pawn", "+0.3")
+            } else {
+                MoveCandidate("c5", "c7", "c5", "Pawn", "+0.1")
+            }
         }
 
         var bestMove = legalMoves.first()
@@ -707,7 +770,19 @@ class LiveChessMatchTracker {
         val cpScore = bestScore / 100.0
         val sign = if (cpScore >= 0) "+" else ""
         val formattedScore = "$sign${String.format("%.1f", cpScore)}"
-        return MoveCandidate(bestMove.san, formattedScore)
+
+        val fromSq = "${('a' + bestMove.fromC)}${8 - bestMove.fromR}"
+        val toSq = "${('a' + bestMove.toC)}${8 - bestMove.toR}"
+        val pieceName = when (board[bestMove.fromR][bestMove.fromC].uppercaseChar()) {
+            'N' -> "Knight"
+            'B' -> "Bishop"
+            'R' -> "Rook"
+            'Q' -> "Queen"
+            'K' -> "King"
+            else -> "Pawn"
+        }
+
+        return MoveCandidate(bestMove.san, fromSq, toSq, pieceName, formattedScore)
     }
 
     data class LegalMove(val fromR: Int, val fromC: Int, val toR: Int, val toC: Int, val san: String)
