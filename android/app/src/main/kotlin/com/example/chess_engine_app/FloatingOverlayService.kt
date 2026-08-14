@@ -40,12 +40,12 @@ class FloatingOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var floatingView: View? = null
-    private var evalTextView: TextView? = null
+    private var evalBadge: TextView? = null
     private var moveTextView: TextView? = null
     private var depthTextView: TextView? = null
-    private var colorToggleBtn: TextView? = null
+    private var colorBadge: TextView? = null
     private var syncBtn: TextView? = null
-    private var liveStatusDot: TextView? = null
+    private var liveBadge: TextView? = null
     private var closeBtn: TextView? = null
 
     private var isPlayerWhite = true
@@ -186,11 +186,10 @@ class FloatingOverlayService : Service() {
                 backgroundHandler
             )
 
-            // Start Live Move Detection Loop
             startContinuousMoveTracking()
 
             mainHandler.post {
-                liveStatusDot?.setTextColor(Color.parseColor("#22C55E")) // Green = Active Live
+                liveBadge?.setTextColor(Color.parseColor("#22C55E")) // Green = Active Live
                 val firstMove = liveGameState.getBestMoveFor(isPlayerWhite)
                 updateOverlayUI(firstMove.score, firstMove.moveSan, "GM Engine")
             }
@@ -219,7 +218,7 @@ class FloatingOverlayService : Service() {
                 }
 
                 if (autoDetectRunning) {
-                    backgroundHandler?.postDelayed(this, 600) // Scan every 600ms
+                    backgroundHandler?.postDelayed(this, 500) // Fast 500ms radar loop
                 }
             }
         })
@@ -229,13 +228,11 @@ class FloatingOverlayService : Service() {
         if (isAnalyzing.getAndSet(true)) return
 
         try {
-            // Detect if Chess.com or Lichess highlight shows a move occurred
             val moveCandidate = ChessHighlightTracker.findHighlightedMove(frame, isPlayerWhite)
             if (moveCandidate != null) {
                 liveGameState.recordMoveIfValid(moveCandidate)
             }
 
-            // Compute Grandmaster Response Move
             val response = liveGameState.getBestMoveFor(isPlayerWhite)
             mainHandler.post {
                 updateOverlayUI(response.score, response.moveSan, "Live")
@@ -260,26 +257,40 @@ class FloatingOverlayService : Service() {
         isPlayerWhite = !isPlayerWhite
         lastObservedSignature = 0L
         mainHandler.post {
-            colorToggleBtn?.text = if (isPlayerWhite) "⚪" else "⚫"
+            updateColorBadgeUI()
             val next = liveGameState.getBestMoveFor(isPlayerWhite)
             updateOverlayUI(next.score, next.moveSan, "Live")
         }
     }
 
+    private fun updateColorBadgeUI() {
+        colorBadge?.let { badge ->
+            badge.text = if (isPlayerWhite) "♔ W" else "♚ B"
+            badge.setTextColor(if (isPlayerWhite) Color.parseColor("#0F172A") else Color.WHITE)
+            val bg = GradientDrawable().apply {
+                setColor(if (isPlayerWhite) Color.WHITE else Color.parseColor("#1E293B"))
+                cornerRadius = 20f
+                setStroke(2, if (isPlayerWhite) Color.parseColor("#E2E8F0") else Color.parseColor("#475569"))
+            }
+            badge.background = bg
+        }
+    }
+
     private fun updateOverlayUI(eval: String, move: String, depth: String) {
         try {
-            evalTextView?.text = eval
-            val prefix = if (isPlayerWhite) "⚪ " else "⚫ "
-            moveTextView?.text = "$prefix$move"
+            evalBadge?.text = eval
+            moveTextView?.text = move
             depthTextView?.text = depth
 
-            if (eval.startsWith("+") || (!eval.startsWith("-") && eval != "0.0")) {
-                evalTextView?.setTextColor(Color.parseColor("#22C55E")) // Green
-            } else if (eval.startsWith("-")) {
-                evalTextView?.setTextColor(Color.parseColor("#EF4444")) // Red
-            } else {
-                evalTextView?.setTextColor(Color.WHITE)
+            val isAdvantage = eval.startsWith("+") || (!eval.startsWith("-") && eval != "0.0")
+            evalBadge?.setTextColor(if (isAdvantage) Color.parseColor("#4ADE80") else Color.parseColor("#F87171"))
+
+            val evalBg = GradientDrawable().apply {
+                setColor(if (isAdvantage) Color.parseColor("#2022C55E") else Color.parseColor("#20EF4444"))
+                cornerRadius = 16f
+                setStroke(1, if (isAdvantage) Color.parseColor("#4022C55E") else Color.parseColor("#40EF4444"))
             }
+            evalBadge?.background = evalBg
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -304,102 +315,123 @@ class FloatingOverlayService : Service() {
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                x = 50
-                y = 150
+                x = 40
+                y = 140
             }
 
+            // High-End Luxury Glass Container
             val container = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(18, 10, 18, 10)
+                setPadding(16, 8, 16, 8)
 
                 val bg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#F5080C14"))
-                    cornerRadius = 32f
-                    setStroke(2, Color.parseColor("#38BDF8"))
+                    setColor(Color.parseColor("#F4090D16")) // Deep midnight frosted glass
+                    cornerRadius = 36f
+                    setStroke(2, Color.parseColor("#38BDF8")) // Electric Cyan Border
                 }
                 background = bg
-                elevation = 28f
+                elevation = 32f
             }
 
-            // ⚪ / ⚫ Color Toggle Button
-            colorToggleBtn = TextView(this).apply {
-                text = "⚪"
-                textSize = 15f
+            // ♔ W / ♚ B Styled Player Badge
+            colorBadge = TextView(this).apply {
+                text = "♔ W"
+                textSize = 12f
                 paint.isFakeBoldText = true
-                setPadding(0, 0, 8, 0)
+                setPadding(14, 6, 14, 6)
                 setOnClickListener {
                     togglePlayerColor()
                 }
             }
+            updateColorBadgeUI()
 
-            // 🔄 Sync / Reset Button
+            // ↻ SYNC Pill Button
             syncBtn = TextView(this).apply {
-                text = "🔄"
-                textSize = 13f
+                text = "↻ SYNC"
+                setTextColor(Color.parseColor("#38BDF8"))
+                textSize = 11f
                 paint.isFakeBoldText = true
-                setPadding(0, 0, 8, 0)
+                setPadding(12, 6, 12, 6)
+                val syncBg = GradientDrawable().apply {
+                    setColor(Color.parseColor("#1A38BDF8"))
+                    cornerRadius = 16f
+                    setStroke(1, Color.parseColor("#4038BDF8"))
+                }
+                background = syncBg
                 setOnClickListener {
                     resetAndSyncGame()
                 }
             }
 
-            // 🟢 Live Status Indicator
-            liveStatusDot = TextView(this).apply {
-                text = "●"
-                setTextColor(Color.parseColor("#38BDF8"))
-                textSize = 14f
+            // ● LIVE Radar Indicator
+            liveBadge = TextView(this).apply {
+                text = "● LIVE"
+                setTextColor(Color.parseColor("#22C55E"))
+                textSize = 10f
                 paint.isFakeBoldText = true
-                setPadding(0, 0, 8, 0)
+                setPadding(10, 0, 8, 0)
                 setOnClickListener {
                     inspectScreenForMove(latestBitmap ?: return@setOnClickListener)
                 }
             }
 
-            evalTextView = TextView(this).apply {
+            // Score Pill Badge (+0.4 / -1.2)
+            evalBadge = TextView(this).apply {
                 text = "+0.3"
-                setTextColor(Color.parseColor("#22C55E"))
-                textSize = 14f
+                setTextColor(Color.parseColor("#4ADE80"))
+                textSize = 13f
                 paint.isFakeBoldText = true
-                setPadding(0, 0, 8, 0)
+                setPadding(12, 5, 12, 5)
             }
 
+            // Grandmaster Best Move Display
             moveTextView = TextView(this).apply {
-                text = "⚪ e4"
+                text = "e4"
                 setTextColor(Color.WHITE)
-                textSize = 14f
+                textSize = 15f
                 paint.isFakeBoldText = true
+                setPadding(10, 0, 4, 0)
             }
 
+            // Depth Tag
             depthTextView = TextView(this).apply {
-                text = "Live"
+                text = "D12"
                 setTextColor(Color.parseColor("#94A3B8"))
                 textSize = 10f
                 visibility = View.GONE
                 setPadding(6, 0, 0, 0)
             }
 
+            // Sleek Close Button
             closeBtn = TextView(this).apply {
                 text = " ✕"
-                setTextColor(Color.parseColor("#64748B"))
-                textSize = 12f
+                setTextColor(Color.parseColor("#94A3B8"))
+                textSize = 13f
                 paint.isFakeBoldText = true
-                setPadding(8, 0, 0, 0)
+                setPadding(10, 0, 4, 0)
                 setOnClickListener {
                     stopSelf()
                 }
             }
 
-            container.addView(colorToggleBtn)
+            val space1 = View(this).apply { layoutParams = LinearLayout.LayoutParams(10, 1) }
+            val space2 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
+            val space3 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
+
+            container.addView(colorBadge)
+            container.addView(space1)
             container.addView(syncBtn)
-            container.addView(liveStatusDot)
-            container.addView(evalTextView)
+            container.addView(space2)
+            container.addView(liveBadge)
+            container.addView(space3)
+            container.addView(evalBadge)
             container.addView(moveTextView)
             container.addView(depthTextView)
             container.addView(closeBtn)
             floatingView = container
 
-            // Dragging & Expansion
+            // Smooth Dragging & Expansion
             container.setOnTouchListener(object : View.OnTouchListener {
                 private var initialX = 0
                 private var initialY = 0
@@ -434,7 +466,7 @@ class FloatingOverlayService : Service() {
                             }
                         }
                         MotionEvent.ACTION_UP -> {
-                            if (isClick && event.rawX > (initialTouchX + 120)) {
+                            if (isClick && event.rawX > (initialTouchX + 160)) {
                                 isExpanded = !isExpanded
                                 depthTextView?.visibility = if (isExpanded) View.VISIBLE else View.GONE
                             }
@@ -467,7 +499,7 @@ class FloatingOverlayService : Service() {
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, "chess_overlay_channel")
             .setContentTitle("BlurChess Live Assistant Active")
-            .setContentText("Auto-detecting Chess.com moves • Tap 🔄 to sync new game")
+            .setContentText("Auto-detecting Chess.com moves • Tap ↻ SYNC to reset match")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
@@ -582,8 +614,6 @@ object ChessHighlightTracker {
                 val g = Color.green(color)
                 val b = Color.blue(color)
 
-                // Chess.com yellow move highlight: high Red and Green, low Blue
-                // Lichess green move highlight: high Green, moderate Red
                 val isYellowHighlight = (r > 160 && g > 160 && b < 140 && abs(r - g) < 60)
                 val isCyanHighlight = (g > 150 && b > 160 && r < 140)
 
@@ -613,7 +643,6 @@ class LiveChessMatchTracker {
 
     fun resetToStartingPosition() {
         moveCount = 0
-        // Standard initial position
         val initial = arrayOf(
             "rnbqkbnr",
             "pppppppp",

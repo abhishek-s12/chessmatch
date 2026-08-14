@@ -298,63 +298,101 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
               ),
               const SizedBox(height: 16),
 
-              // Visual Preview of the Floating Bubble
+              // Visual Preview of the Floating HUD Bubble
               const Text(
-                'Interactive Floating Bubble Preview',
+                'Luxury Floating HUD Preview',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 10),
               Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xF2080C14),
-                    borderRadius: BorderRadius.circular(32),
+                    color: const Color(0xF4090D16),
+                    borderRadius: BorderRadius.circular(36),
                     border: Border.all(color: AppTheme.primaryNeon, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.primaryNeon.withOpacity(0.35),
-                        blurRadius: 16,
-                        spreadRadius: 1,
+                        color: AppTheme.primaryNeon.withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 2,
                       ),
                     ],
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        '📸 ',
-                        style: TextStyle(fontSize: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Text(
+                          '♔ W',
+                          style: TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
-                      Text(
-                        '+1.8',
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0x2038BDF8),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0x4038BDF8)),
+                        ),
+                        child: const Text(
+                          '↻ SYNC',
+                          style: TextStyle(
+                            color: AppTheme.primaryNeon,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '● LIVE',
                         style: TextStyle(
                           color: AppTheme.secondaryNeon,
                           fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Text(
-                        'Next: Nf3',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'D12',
-                        style: TextStyle(
-                          color: AppTheme.textMuted,
                           fontSize: 10,
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Text(
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0x2022C55E),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0x4022C55E)),
+                        ),
+                        child: const Text(
+                          '+0.4',
+                          style: TextStyle(
+                            color: AppTheme.secondaryNeon,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Nf3',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
                         '✕',
-                        style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
