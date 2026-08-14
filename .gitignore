@@ -9,6 +9,7 @@
 .history
 .svn/
 migrate_working_dir/
+*.zip
 
 # IntelliJ related
 *.iml
@@ -33,6 +34,7 @@ migrate_working_dir/
 # Android related
 **/android/**/gradle-wrapper.jar
 **/android/.gradle
+.gradle/
 **/android/captures/
 **/android/gradlew
 **/android/gradlew.bat
@@ -58,22 +60,13 @@ migrate_working_dir/
 **/ios/**/.symlinks/
 **/ios/**/profile
 **/ios/**/xcuserdata
-**/ios/.generated/
-**/ios/Flutter/App.framework
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/app.flx
-**/ios/Flutter/app.zip
-**/ios/Flutter/flutter_assets/
-**/ios/ServiceDefinitions.json
-**/macos/Flutter/ephemeral
-
-# Coverage
-coverage/
 
 # Symbols
 app.*.symbols
+app.*.map.json
 
-# Exceptions to above rules.
-!**/android/gradle/wrapper/gradle-wrapper.jar
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
