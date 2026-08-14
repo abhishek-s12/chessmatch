@@ -42,6 +42,19 @@ class OverlayService {
     }
   }
 
+  static Future<bool> startScreenCapture() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return true;
+    }
+    try {
+      final bool? result = await _channel.invokeMethod<bool>('startScreenCapture');
+      return result ?? false;
+    } catch (e) {
+      debugPrint('Error starting screen capture: $e');
+      return false;
+    }
+  }
+
   static Future<void> stopOverlay() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return;

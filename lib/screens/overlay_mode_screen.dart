@@ -17,6 +17,7 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
 
   bool _hasPermission = false;
   bool _isOverlayRunning = false;
+  bool _isScreenCaptureEnabled = false;
   bool _isTestingLiveEngine = false;
   String _statusMessage = 'Checking overlay permissions...';
 
@@ -54,7 +55,6 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
 
   Future<void> _requestPermission() async {
     await OverlayService.requestPermission();
-    // Allow small delay for OS intent
     await Future.delayed(const Duration(milliseconds: 400));
     await _checkPermission();
   }
@@ -65,6 +65,7 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
       if (!mounted) return;
       setState(() {
         _isOverlayRunning = false;
+        _isScreenCaptureEnabled = false;
         _isTestingLiveEngine = false;
       });
     } else {
@@ -81,8 +82,31 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
       // Send initial test evaluation
       await OverlayService.updateOverlay(
         eval: "+0.3",
-        bestMove: "e2e4",
+        bestMove: "e4",
         isWhite: true,
+      );
+    }
+  }
+
+  Future<void> _enableScreenCapture() async {
+    if (!_isOverlayRunning) {
+      await _toggleOverlay();
+    }
+    final success = await OverlayService.startScreenCapture();
+    if (mounted) {
+      setState(() {
+        _isScreenCaptureEnabled = success;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? '📸 Screen Capture Enabled! Tap 📸 on the floating bubble to scan the screen.'
+                : 'Screen capture permission was not granted.',
+          ),
+          backgroundColor: success ? AppTheme.secondaryNeon : AppTheme.alertRed,
+          duration: const Duration(seconds: 3),
+        ),
       );
     }
   }
@@ -128,8 +152,8 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'FLOATING OVERLAY ASSISTANT',
-          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2, fontSize: 15),
+          'FLOATING OVERLAY & SCREEN DETECTOR',
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2, fontSize: 14),
         ),
       ),
       body: SafeArea(
@@ -151,12 +175,12 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.picture_in_picture_alt, color: AppTheme.primaryNeon, size: 22),
+                        Icon(Icons.camera_alt_outlined, color: AppTheme.primaryNeon, size: 22),
                         SizedBox(width: 8),
                         Text(
-                          'BlurChess Floating Bubble',
+                          'Live Screen Chessboard Auto-Detect',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -165,7 +189,7 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'The floating pill stays on top of your screen while using other apps, displaying live Stockfish engine evaluations and top moves for post-game study and bot practice.',
+                      'BlurChess can capture your live Android screen, detect the 8x8 chessboard and pieces from Chess.com or Lichess, and calculate instant Stockfish moves on the floating bubble.',
                       style: TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.4),
                     ),
                   ],
@@ -184,7 +208,7 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Overlay Service Status',
+                            'Overlay & Screen Capture',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           Container(
@@ -197,7 +221,7 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
                               ),
                             ),
                             child: Text(
-                              _isOverlayRunning ? 'ACTIVE' : 'OFFLINE',
+                              _isOverlayRunning ? 'OVERLAY ACTIVE' : 'OFFLINE',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -229,7 +253,7 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
                           label: const Text('Grant Overlay Permission', style: TextStyle(fontWeight: FontWeight.bold)),
                           onPressed: _requestPermission,
                         )
-                      else
+                      else ...[
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isOverlayRunning ? AppTheme.alertRed : AppTheme.primaryNeon,
@@ -239,11 +263,35 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
                           ),
                           icon: Icon(_isOverlayRunning ? Icons.stop_circle : Icons.play_arrow),
                           label: Text(
-                            _isOverlayRunning ? 'STOP FLOATING OVERLAY' : 'LAUNCH FLOATING OVERLAY',
+                            _isOverlayRunning ? 'STOP FLOATING OVERLAY' : 'START FLOATING OVERLAY',
                             style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1),
                           ),
                           onPressed: _toggleOverlay,
                         ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(46),
+                            side: BorderSide(
+                              color: _isScreenCaptureEnabled ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: Icon(
+                            _isScreenCaptureEnabled ? Icons.check_circle : Icons.camera_alt,
+                            color: _isScreenCaptureEnabled ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                          ),
+                          label: Text(
+                            _isScreenCaptureEnabled ? 'SCREEN CAPTURE AUTHORIZED (READY)' : 'ENABLE SCREEN AUTO-DETECT (MEDIA PROJECTION)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: _isScreenCaptureEnabled ? AppTheme.secondaryNeon : AppTheme.primaryNeon,
+                            ),
+                          ),
+                          onPressed: _enableScreenCapture,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -252,20 +300,20 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
 
               // Visual Preview of the Floating Bubble
               const Text(
-                'Interactive Preview',
+                'Interactive Floating Bubble Preview',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 10),
               Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xEE0B0F19),
+                    color: const Color(0xF2080C14),
                     borderRadius: BorderRadius.circular(32),
                     border: Border.all(color: AppTheme.primaryNeon, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.primaryNeon.withOpacity(0.3),
+                        color: AppTheme.primaryNeon.withOpacity(0.35),
                         blurRadius: 16,
                         spreadRadius: 1,
                       ),
@@ -275,35 +323,70 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
+                        '📸 ',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      Text(
                         '+1.8',
                         style: TextStyle(
                           color: AppTheme.secondaryNeon,
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: 15,
                         ),
                       ),
-                      SizedBox(width: 14),
+                      SizedBox(width: 12),
                       Text(
                         'Next: Nf3',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                          fontSize: 14,
                         ),
                       ),
-                      SizedBox(width: 10),
+                      SizedBox(width: 8),
                       Text(
                         'D12',
                         style: TextStyle(
                           color: AppTheme.textMuted,
-                          fontSize: 11,
+                          fontSize: 10,
                         ),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        '✕',
+                        style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 20),
+
+              // How to Use Guide
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceDark,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '📱 How to use with Chess.com:',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    SizedBox(height: 8),
+                    Text('1. Tap "START FLOATING OVERLAY" and "ENABLE SCREEN AUTO-DETECT".', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                    SizedBox(height: 4),
+                    Text('2. Switch to the Chess.com app or a browser showing a chess match.', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                    SizedBox(height: 4),
+                    Text('3. Tap the 📸 icon on the floating bubble anytime to scan and calculate the best move in <150ms!', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Test Presets & Live Engine Trigger
               Card(
@@ -318,7 +401,7 @@ class _OverlayModeScreenState extends State<OverlayModeScreen> with WidgetsBindi
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Send real-time eval presets directly to your floating overlay to verify live updates.',
+                        'Send real-time eval presets directly to your floating overlay to test live responses.',
                         style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                       ),
                       const SizedBox(height: 12),
