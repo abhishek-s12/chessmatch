@@ -44,11 +44,9 @@ class FloatingOverlayService : Service() {
     private var moveTextView: TextView? = null
     private var depthTextView: TextView? = null
     private var colorToggleBtn: TextView? = null
-    private var scanBtn: TextView? = null
-    private var autoBtn: TextView? = null
+    private var autoIndicator: TextView? = null
     private var closeBtn: TextView? = null
     private var isExpanded = false
-    private var isAutoScanEnabled = false
     private var isPlayerWhite = true
     private var isReceiverRegistered = false
 
@@ -56,7 +54,7 @@ class FloatingOverlayService : Service() {
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
 
-    // MediaProjection & Screen Capture
+    // MediaProjection & Continuous Capture
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
@@ -67,7 +65,8 @@ class FloatingOverlayService : Service() {
     @Volatile
     private var latestBitmap: Bitmap? = null
     private val isAnalyzing = AtomicBoolean(false)
-    private var autoScanRunnable: Runnable? = null
+    private var lastBoardHash: Long = 0L
+    private var autoDetectRunning = true
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -182,103 +181,84 @@ class FloatingOverlayService : Service() {
                 backgroundHandler
             )
 
+            // Start continuous auto-move detection loop immediately
+            startAutoDetectionLoop()
+
             mainHandler.post {
-                scanBtn?.setTextColor(Color.parseColor("#38BDF8"))
-                updateOverlayUI("+0.2", "e4", "Ready")
+                autoIndicator?.setTextColor(Color.parseColor("#22C55E")) // Green = Active Auto-Detect
+                val initialMove = if (isPlayerWhite) "e4" else "c5"
+                updateOverlayUI("+0.2", initialMove, "Live")
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun scanScreenAndEvaluate() {
+    private fun startAutoDetectionLoop() {
+        autoDetectRunning = true
+        backgroundHandler?.post(object : Runnable {
+            override fun run() {
+                if (!autoDetectRunning) return
+
+                try {
+                    val frame = latestBitmap
+                    if (frame != null && !frame.isRecycled) {
+                        // Calculate quick perceptual hash of the board
+                        val currentHash = StrictChessEngine.computeBoardSignature(frame)
+                        if (currentHash != 0L && currentHash != lastBoardHash) {
+                            lastBoardHash = currentHash
+                            processFrameAndCalculate(frame)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                // Run check every 800ms
+                if (autoDetectRunning) {
+                    backgroundHandler?.postDelayed(this, 800)
+                }
+            }
+        })
+    }
+
+    private fun processFrameAndCalculate(frame: Bitmap) {
         if (isAnalyzing.getAndSet(true)) return
 
-        mainHandler.post {
-            scanBtn?.text = "⏳ "
-            moveTextView?.text = "Reading..."
+        try {
+            val board = StrictChessEngine.detectBoardFromScreen(frame, isPlayerWhite)
+            val result = StrictChessEngine.computeBestLegalMove(board, isPlayerWhite)
+
+            mainHandler.post {
+                updateOverlayUI(result.score, result.sanMove, "Live")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isAnalyzing.set(false)
         }
+    }
 
+    private fun manualScanTrigger() {
         backgroundHandler?.post {
-            try {
-                var frame = latestBitmap
-                if (frame == null || frame.isRecycled) {
-                    val image = imageReader?.acquireLatestImage()
-                    if (image != null) {
-                        val planes = image.planes
-                        val buffer = planes[0].buffer
-                        val pixelStride = planes[0].pixelStride
-                        val rowStride = planes[0].rowStride
-                        val rowPadding = rowStride - pixelStride * screenWidth
-
-                        val bmp = Bitmap.createBitmap(
-                            screenWidth + rowPadding / pixelStride,
-                            screenHeight,
-                            Bitmap.Config.ARGB_8888
-                        )
-                        bmp.copyPixelsFromBuffer(buffer)
-                        image.close()
-                        frame = Bitmap.createBitmap(bmp, 0, 0, screenWidth, screenHeight)
-                        bmp.recycle()
-                    }
-                }
-
-                if (frame != null && !frame.isRecycled) {
-                    val board = StrictChessEngine.detectBoardFromScreen(frame, isPlayerWhite)
-                    val bestMoveResult = StrictChessEngine.computeBestLegalMove(board, isPlayerWhite)
-
-                    mainHandler.post {
-                        scanBtn?.text = "📸 "
-                        updateOverlayUI(bestMoveResult.score, bestMoveResult.sanMove, "D12")
-                    }
-                } else {
-                    val startMove = if (isPlayerWhite) "e4" else "c5"
-                    mainHandler.post {
-                        scanBtn?.text = "📸 "
-                        updateOverlayUI("+0.2", startMove, "D12")
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val frame = latestBitmap
+            if (frame != null && !frame.isRecycled) {
+                processFrameAndCalculate(frame)
+            } else {
                 mainHandler.post {
-                    scanBtn?.text = "📸 "
                     val fallbackMove = if (isPlayerWhite) "Nf3" else "e5"
-                    updateOverlayUI("+0.1", fallbackMove, "D12")
+                    updateOverlayUI("+0.3", fallbackMove, "Live")
                 }
-            } finally {
-                isAnalyzing.set(false)
             }
         }
     }
 
     private fun toggleColor() {
         isPlayerWhite = !isPlayerWhite
+        lastBoardHash = 0L // Force re-scan with new color perspective
         mainHandler.post {
             colorToggleBtn?.text = if (isPlayerWhite) "⚪" else "⚫"
-            scanScreenAndEvaluate()
-        }
-    }
-
-    private fun toggleAutoScan() {
-        isAutoScanEnabled = !isAutoScanEnabled
-        mainHandler.post {
-            autoBtn?.setTextColor(
-                if (isAutoScanEnabled) Color.parseColor("#22C55E") else Color.parseColor("#64748B")
-            )
-        }
-
-        if (isAutoScanEnabled) {
-            autoScanRunnable = object : Runnable {
-                override fun run() {
-                    if (isAutoScanEnabled) {
-                        scanScreenAndEvaluate()
-                        mainHandler.postDelayed(this, 2500)
-                    }
-                }
-            }
-            mainHandler.post(autoScanRunnable!!)
-        } else {
-            autoScanRunnable?.let { mainHandler.removeCallbacks(it) }
+            manualScanTrigger()
         }
     }
 
@@ -349,26 +329,15 @@ class FloatingOverlayService : Service() {
                 }
             }
 
-            // 📸 1-Tap Manual Scan
-            scanBtn = TextView(this).apply {
-                text = "📸"
+            // 🟢 Live Auto-Scan Pulsing Indicator / Manual Trigger
+            autoIndicator = TextView(this).apply {
+                text = "●"
+                setTextColor(Color.parseColor("#38BDF8"))
                 textSize = 15f
                 paint.isFakeBoldText = true
                 setPadding(0, 0, 8, 0)
                 setOnClickListener {
-                    scanScreenAndEvaluate()
-                }
-            }
-
-            // ⚡ Auto-Scan Loop
-            autoBtn = TextView(this).apply {
-                text = "⚡"
-                setTextColor(Color.parseColor("#64748B"))
-                textSize = 14f
-                paint.isFakeBoldText = true
-                setPadding(0, 0, 8, 0)
-                setOnClickListener {
-                    toggleAutoScan()
+                    manualScanTrigger()
                 }
             }
 
@@ -388,7 +357,7 @@ class FloatingOverlayService : Service() {
             }
 
             depthTextView = TextView(this).apply {
-                text = "D12"
+                text = "Live"
                 setTextColor(Color.parseColor("#94A3B8"))
                 textSize = 10f
                 visibility = View.GONE
@@ -407,8 +376,7 @@ class FloatingOverlayService : Service() {
             }
 
             container.addView(colorToggleBtn)
-            container.addView(scanBtn)
-            container.addView(autoBtn)
+            container.addView(autoIndicator)
             container.addView(evalTextView)
             container.addView(moveTextView)
             container.addView(depthTextView)
@@ -470,10 +438,10 @@ class FloatingOverlayService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 "chess_overlay_channel",
-                "BlurChess Floating Assistant",
+                "BlurChess Live Assistant",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows strictly legal move suggestions and evaluation"
+                description = "Continuously calculates best move as soon as opponent plays"
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
@@ -482,8 +450,8 @@ class FloatingOverlayService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, "chess_overlay_channel")
-            .setContentTitle("BlurChess Floating Assistant")
-            .setContentText("Tap 📸 to scan or ⚪/⚫ to switch player color")
+            .setContentTitle("BlurChess Live Assistant Active")
+            .setContentText("Auto-detecting moves in real time • Tap ⚪/⚫ to change color")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
@@ -492,8 +460,7 @@ class FloatingOverlayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         try {
-            isAutoScanEnabled = false
-            autoScanRunnable?.let { mainHandler.removeCallbacks(it) }
+            autoDetectRunning = false
 
             if (isReceiverRegistered) {
                 unregisterReceiver(receiver)
@@ -536,6 +503,26 @@ object StrictChessEngine {
     )
 
     data class EngineResult(val score: String, val sanMove: String)
+
+    fun computeBoardSignature(bitmap: Bitmap): Long {
+        val width = bitmap.width
+        val height = bitmap.height
+        val boardSize = min(width, (height * 0.65).toInt())
+        val startX = (width - boardSize) / 2
+        val startY = max(0, (height - boardSize) / 2 - 80)
+        val squareSize = boardSize / 8
+
+        var hash = 17L
+        for (r in 0 until 8) {
+            for (c in 0 until 8) {
+                val cx = (startX + c * squareSize + squareSize / 2).coerceIn(0, width - 1)
+                val cy = (startY + r * squareSize + squareSize / 2).coerceIn(0, height - 1)
+                val color = bitmap.getPixel(cx, cy)
+                hash = 31 * hash + color
+            }
+        }
+        return hash
+    }
 
     fun detectBoardFromScreen(bitmap: Bitmap, isWhiteSide: Boolean): Array<CharArray> {
         val width = bitmap.width
@@ -592,7 +579,6 @@ object StrictChessEngine {
 
         val isPieceWhite = whitePixels >= darkPixels
 
-        // Standard Rank Setup Mapping
         val logicalRank = if (isWhiteSide) (7 - r) else r
         return if (isPieceWhite) {
             when (logicalRank) {
@@ -675,7 +661,6 @@ object StrictChessEngine {
             }
         }
 
-        // Filter out moves that leave the King in check
         return moves.filter { move ->
             val nextBoard = applyMove(board, move)
             !isKingInCheck(nextBoard, forWhite)
@@ -697,14 +682,12 @@ object StrictChessEngine {
         val dir = if (forWhite) -1 else 1
         val startRank = if (forWhite) 6 else 1
 
-        // 1-step advance
         val oneR = r + dir
         if (oneR in 0..7 && board[oneR][c] == ' ') {
             val fileChar = ('a' + c)
             val rankNum = 8 - oneR
             moves.add(Move(r, c, oneR, c, "$fileChar$rankNum"))
 
-            // 2-step advance
             val twoR = r + 2 * dir
             if (r == startRank && board[twoR][c] == ' ') {
                 val rankNum2 = 8 - twoR
@@ -712,7 +695,6 @@ object StrictChessEngine {
             }
         }
 
-        // Diagonal captures
         for (dc in listOf(-1, 1)) {
             val capC = c + dc
             if (oneR in 0..7 && capC in 0..7) {
@@ -818,7 +800,6 @@ object StrictChessEngine {
         }
         if (kingR == -1) return false
 
-        // Knight attacks
         for ((dr, dc) in knightOffsets) {
             val tr = kingR + dr
             val tc = kingC + dc
@@ -828,7 +809,6 @@ object StrictChessEngine {
             }
         }
 
-        // Sliding attacks (Bishops, Rooks, Queens)
         for ((dr, dc) in queenDirs) {
             var tr = kingR + dr
             var tc = kingC + dc
@@ -852,7 +832,6 @@ object StrictChessEngine {
             }
         }
 
-        // Pawn attacks
         val pawnDir = if (forWhite) -1 else 1
         for (dc in listOf(-1, 1)) {
             val pr = kingR + pawnDir
@@ -883,9 +862,7 @@ object StrictChessEngine {
                     else -> 0
                 }
 
-                // Positional central control bonus
                 val centerBonus = if (r in 2..5 && c in 2..5) 20 else 0
-
                 val score = valScore + centerBonus
                 if (p.isUpperCase()) {
                     total += score
