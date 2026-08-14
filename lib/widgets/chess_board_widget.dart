@@ -7,7 +7,7 @@ import '../services/sound_service.dart';
 import '../theme/app_theme.dart';
 import 'chess_piece_painter.dart';
 
-class ChessBoardWidget extends StatelessWidget {
+class ChessBoardWidget extends StatefulWidget {
   final String? bestMoveUci;
   final Function(ChessMove)? onMoveMade;
   final bool interactive;
@@ -20,6 +20,13 @@ class ChessBoardWidget extends StatelessWidget {
   });
 
   @override
+  State<ChessBoardWidget> createState() => _ChessBoardWidgetState();
+}
+
+class _ChessBoardWidgetState extends State<ChessBoardWidget> with SingleTickerProviderStateMixin {
+  BoardPosition? _draggingPosition;
+
+  @override
   Widget build(BuildContext context) {
     final game = context.watch<ChessGameState>();
     final isFlipped = game.isFlipped;
@@ -28,21 +35,14 @@ class ChessBoardWidget extends StatelessWidget {
     return AspectRatio(
       aspectRatio: 1.0,
       child: Container(
+        // Flat, square-cornered, shadowless Chess.com grid chrome
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: boardTheme.borderColor, width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.5),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          color: boardTheme.darkSquare,
+          border: Border.all(color: const Color(0xFF3B3935), width: 1.0),
         ),
-        clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // 8x8 Board Grid
+            // 8x8 Chess.com Grid
             Column(
               children: List.generate(8, (displayRow) {
                 final actualRow = isFlipped ? 7 - displayRow : displayRow;
@@ -69,8 +69,8 @@ class ChessBoardWidget extends StatelessWidget {
             ),
 
             // Best Move Vector Arrow Overlay
-            if (bestMoveUci != null && bestMoveUci!.length >= 4)
-              _buildBestMoveOverlay(game, isFlipped, boardTheme.accentColor),
+            if (widget.bestMoveUci != null && widget.bestMoveUci!.length >= 4)
+              _buildBestMoveOverlay(game, isFlipped, const Color(0xFF81B64C)),
           ],
         ),
       ),
@@ -95,11 +95,9 @@ class ChessBoardWidget extends StatelessWidget {
         piece.color == game.turn &&
         game.isKingInCheck(game.turn);
 
-    // Is this square the source or destination of the last move played?
     final isLastMoveSource = game.moveHistory.isNotEmpty && game.moveHistory.last.from == pos;
     final isLastMoveDest = game.moveHistory.isNotEmpty && game.moveHistory.last.to == pos;
 
-    // Coordinate displays (Top-Left of 'a' file squares, Bottom-Right of rank 1 squares)
     final showRankLabel = isFlipped ? (displayCol == 7) : (displayCol == 0);
     final showFileLabel = isFlipped ? (displayRow == 0) : (displayRow == 7);
     final rankText = (isFlipped ? (pos.row + 1) : (8 - pos.row)).toString();
@@ -108,226 +106,285 @@ class ChessBoardWidget extends StatelessWidget {
 
     Color squareColor = isLight ? theme.lightSquare : theme.darkSquare;
     if (isSelected) {
-      squareColor = theme.accentColor.withOpacity(0.60);
+      squareColor = theme.accentColor.withOpacity(0.65);
     } else if (isLastMoveSource || isLastMoveDest) {
-      squareColor = theme.accentColor.withOpacity(0.35);
+      squareColor = theme.accentColor.withOpacity(0.40);
     } else if (isKingInCheck) {
       squareColor = const Color(0xFFDC2626);
     }
 
-    return GestureDetector(
-      onTap: !interactive
-          ? null
-          : () {
-              if (game.selectedSquare == null) {
-                if (piece != null && piece.color == game.turn) {
-                  game.selectSquare(pos);
-                }
-              } else {
-                if (isLegalMoveTarget) {
-                  final move = game.legalMovesForSelected.firstWhere((m) => m.to == pos);
-                  game.makeMove(move);
-                  SoundService.playMoveSound(isCapture: move.isCapture, isCheck: game.isKingInCheck(game.turn));
-                  onMoveMade?.call(move);
-                } else if (piece != null && piece.color == game.turn) {
-                  game.selectSquare(pos);
-                } else {
-                  game.clearSelection();
-                }
-              }
-            },
-      child: Container(
-        color: squareColor,
-        child: Stack(
-          children: [
-            // Inside-Square Rank Coordinates
-            if (showRankLabel)
-              Positioned(
-                top: 2,
-                left: 3,
-                child: Text(
-                  rankText,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: coordColor.withOpacity(0.85),
-                  ),
-                ),
-              ),
+    final isBeingDragged = _draggingPosition == pos;
 
-            // Inside-Square File Coordinates
-            if (showFileLabel)
-              Positioned(
-                bottom: 2,
-                right: 3,
-                child: Text(
-                  fileText,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: coordColor.withOpacity(0.85),
-                  ),
-                ),
-              ),
+    // DragTarget wrapper so this square can receive a dropped piece
+    return DragTarget<BoardPosition>(
+      onWillAcceptWithDetails: (details) {
+        if (!widget.interactive) return false;
+        final fromPos = details.data;
+        if (fromPos == pos) return false;
+        final legalMoves = game.generateLegalMovesForPiece(fromPos);
+        return legalMoves.any((m) => m.to == pos);
+      },
+      onAcceptWithDetails: (details) {
+        final fromPos = details.data;
+        final legalMoves = game.generateLegalMovesForPiece(fromPos);
+        final matching = legalMoves.where((m) => m.to == pos);
+        if (matching.isNotEmpty) {
+          final move = matching.first;
+          game.makeMove(move);
+          SoundService.playMoveSound(isCapture: move.isCapture, isCheck: game.isKingInCheck(game.turn));
+          widget.onMoveMade?.call(move);
+        }
+        setState(() {
+          _draggingPosition = null;
+        });
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHovered = candidateData.isNotEmpty;
+        final displayColor = isHovered ? theme.accentColor.withOpacity(0.50) : squareColor;
 
-            // Legal Move Target Indicators (Dot for empty, Ring for capture)
-            if (isLegalMoveTarget)
-              Center(
-                child: piece == null
-                    ? Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: theme.accentColor.withOpacity(0.55),
-                          shape: BoxShape.circle,
-                        ),
-                      )
-                    : Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: theme.accentColor.withOpacity(0.80),
-                            width: 3.5,
-                          ),
-                        ),
+        return GestureDetector(
+          onTap: !widget.interactive
+              ? null
+              : () {
+                  if (game.selectedSquare == null) {
+                    if (piece != null && piece.color == game.turn) {
+                      game.selectSquare(pos);
+                    }
+                  } else {
+                    if (isLegalMoveTarget) {
+                      final move = game.legalMovesForSelected.firstWhere((m) => m.to == pos);
+                      game.makeMove(move);
+                      SoundService.playMoveSound(isCapture: move.isCapture, isCheck: game.isKingInCheck(game.turn));
+                      widget.onMoveMade?.call(move);
+                    } else if (piece != null && piece.color == game.turn) {
+                      game.selectSquare(pos);
+                    } else {
+                      game.clearSelection();
+                    }
+                  }
+                },
+          child: Container(
+            color: displayColor,
+            child: Stack(
+              children: [
+                // Inside-Square Rank Coordinates
+                if (showRankLabel)
+                  Positioned(
+                    top: 2,
+                    left: 3,
+                    child: Text(
+                      rankText,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: coordColor,
                       ),
-              ),
+                    ),
+                  ),
 
-            // Staunton HD Vector Piece
-            if (piece != null)
-              Center(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final pieceSize = constraints.maxWidth * 0.85;
-                    return ChessPieceWidget(
-                      piece: piece,
-                      size: pieceSize,
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+                // Inside-Square File Coordinates
+                if (showFileLabel)
+                  Positioned(
+                    bottom: 1,
+                    right: 3,
+                    child: Text(
+                      fileText,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: coordColor,
+                      ),
+                    ),
+                  ),
 
-  Widget _buildBestMoveOverlay(ChessGameState game, bool isFlipped, Color accentColor) {
-    final fromPos = BoardPosition.fromAlgebraic(bestMoveUci!.substring(0, 2));
-    final toPos = BoardPosition.fromAlgebraic(bestMoveUci!.substring(2, 4));
-    if (fromPos == null || toPos == null) return const SizedBox.shrink();
+                // Legal Move Target Highlight Dot or Capture Ring
+                if (isLegalMoveTarget && !isBeingDragged)
+                  Center(
+                    child: piece != null
+                        ? Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.black.withOpacity(0.25),
+                                width: 5.0,
+                              ),
+                            ),
+                          )
+                        : Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.black.withOpacity(0.20),
+                            ),
+                          ),
+                  ),
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final squareSize = constraints.maxWidth / 8.0;
-
-        final fromDisplayCol = isFlipped ? 7 - fromPos.col : fromPos.col;
-        final fromDisplayRow = isFlipped ? 7 - fromPos.row : fromPos.row;
-
-        final toDisplayCol = isFlipped ? 7 - toPos.col : toPos.col;
-        final toDisplayRow = isFlipped ? 7 - toPos.row : toPos.row;
-
-        final fromCenter = Offset(
-          fromDisplayCol * squareSize + squareSize / 2,
-          fromDisplayRow * squareSize + squareSize / 2,
-        );
-        final toCenter = Offset(
-          toDisplayCol * squareSize + squareSize / 2,
-          toDisplayRow * squareSize + squareSize / 2,
-        );
-
-        return IgnorePointer(
-          child: CustomPaint(
-            size: Size(constraints.maxWidth, constraints.maxHeight),
-            painter: _BestMoveArrowPainter(
-              from: fromCenter,
-              to: toCenter,
-              color: accentColor,
+                // Piece Rendering with Drag-and-Drop & Slide Animation
+                if (piece != null && !isBeingDragged)
+                  Center(
+                    child: widget.interactive && piece.color == game.turn
+                        ? Draggable<BoardPosition>(
+                            data: pos,
+                            onDragStarted: () {
+                              setState(() {
+                                _draggingPosition = pos;
+                              });
+                              game.selectSquare(pos);
+                            },
+                            onDragEnd: (_) {
+                              setState(() {
+                                _draggingPosition = null;
+                              });
+                            },
+                            feedback: Material(
+                              color: Colors.transparent,
+                              child: Transform.scale(
+                                scale: 1.15,
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.4),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ChessPieceWidget(
+                                    piece: piece,
+                                    size: 48,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            childWhenDragging: Opacity(
+                              opacity: 0.25,
+                              child: ChessPieceWidget(
+                                piece: piece,
+                                size: 42,
+                              ),
+                            ),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              curve: Curves.easeOutCubic,
+                              child: ChessPieceWidget(
+                                piece: piece,
+                                size: 42,
+                              ),
+                            ),
+                          )
+                        : AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            curve: Curves.easeOutCubic,
+                            child: ChessPieceWidget(
+                              piece: piece,
+                              size: 42,
+                            ),
+                          ),
+                  ),
+              ],
             ),
           ),
         );
       },
     );
   }
+
+  Widget _buildBestMoveOverlay(ChessGameState game, bool isFlipped, Color accentColor) {
+    if (widget.bestMoveUci == null || widget.bestMoveUci!.length < 4) return const SizedBox.shrink();
+
+    final fromCol = widget.bestMoveUci!.codeUnitAt(0) - 'a'.codeUnitAt(0);
+    final fromRow = 8 - int.parse(widget.bestMoveUci![1]);
+    final toCol = widget.bestMoveUci!.codeUnitAt(2) - 'a'.codeUnitAt(0);
+    final toRow = 8 - int.parse(widget.bestMoveUci![3]);
+
+    if (fromCol < 0 || fromCol > 7 ||
+        fromRow < 0 || fromRow > 7 ||
+        toCol < 0 || toCol > 7 ||
+        toRow < 0 || toRow > 7) {
+      return const SizedBox.shrink();
+    }
+
+    final startX = (isFlipped ? 7 - fromCol : fromCol) + 0.5;
+    final startY = (isFlipped ? 7 - fromRow : fromRow) + 0.5;
+    final endX = (isFlipped ? 7 - toCol : toCol) + 0.5;
+    final endY = (isFlipped ? 7 - toRow : toRow) + 0.5;
+
+    return IgnorePointer(
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: _MoveArrowPainter(
+          start: Offset(startX / 8.0, startY / 8.0),
+          end: Offset(endX / 8.0, endY / 8.0),
+          color: const Color(0xFF81B64C),
+        ),
+      ),
+    );
+  }
 }
 
-class _BestMoveArrowPainter extends CustomPainter {
-  final Offset from;
-  final Offset to;
+class _MoveArrowPainter extends CustomPainter {
+  final Offset start;
+  final Offset end;
   final Color color;
 
-  _BestMoveArrowPainter({
-    required this.from,
-    required this.to,
+  _MoveArrowPainter({
+    required this.start,
+    required this.end,
     required this.color,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final dx = to.dx - from.dx;
-    final dy = to.dy - from.dy;
-    final distance = math.sqrt(dx * dx + dy * dy);
-    if (distance < 4) return;
+    final p1 = Offset(start.dx * size.width, start.dy * size.height);
+    final p2 = Offset(end.dx * size.width, end.dy * size.height);
 
-    final angle = math.atan2(dy, dx);
-    const arrowHeadLength = 16.0;
+    final angle = math.atan2(p2.dy - p1.dy, p2.dx - p1.dx);
+    final arrowLength = 16.0;
+    final arrowWidth = 12.0;
 
-    // Shorten end point slightly so arrow head sits right on target
-    final shortenedTo = Offset(
-      to.dx - math.cos(angle) * (arrowHeadLength * 0.4),
-      to.dy - math.sin(angle) * (arrowHeadLength * 0.4),
+    final shaftEnd = Offset(
+      p2.dx - arrowLength * math.cos(angle) * 0.8,
+      p2.dy - arrowLength * math.sin(angle) * 0.8,
     );
-
-    // Glowing shaft line
-    final glowPaint = Paint()
-      ..color = color.withOpacity(0.3)
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(from, shortenedTo, glowPaint);
 
     final linePaint = Paint()
-      ..color = color.withOpacity(0.9)
-      ..strokeWidth = 5.5
+      ..color = color.withOpacity(0.85)
+      ..strokeWidth = 9.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
-    canvas.drawLine(from, shortenedTo, linePaint);
 
-    // Source ring
-    final circlePaint = Paint()
-      ..color = color.withOpacity(0.6)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(from, 7, circlePaint);
+    canvas.drawLine(p1, shaftEnd, linePaint);
 
-    // Arrow head
-    final arrowPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    const arrowWidth = 11.0;
-
-    final p1 = to;
-    final p2 = Offset(
-      to.dx - arrowHeadLength * math.cos(angle) + arrowWidth * math.cos(angle + math.pi / 2),
-      to.dy - arrowHeadLength * math.sin(angle) + arrowWidth * math.sin(angle + math.pi / 2),
+    final headPath = Path();
+    final pLeft = Offset(
+      p2.dx - arrowLength * math.cos(angle) + arrowWidth * math.sin(angle),
+      p2.dy - arrowLength * math.sin(angle) - arrowWidth * math.cos(angle),
     );
-    final p3 = Offset(
-      to.dx - arrowHeadLength * math.cos(angle) - arrowWidth * math.cos(angle + math.pi / 2),
-      to.dy - arrowHeadLength * math.sin(angle) - arrowWidth * math.sin(angle + math.pi / 2),
+    final pRight = Offset(
+      p2.dx - arrowLength * math.cos(angle) - arrowWidth * math.sin(angle),
+      p2.dy - arrowLength * math.sin(angle) + arrowWidth * math.cos(angle),
     );
 
-    path.moveTo(p1.dx, p1.dy);
-    path.lineTo(p2.dx, p2.dy);
-    path.lineTo(p3.dx, p3.dy);
-    path.close();
+    headPath.moveTo(p2.dx, p2.dy);
+    headPath.lineTo(pLeft.dx, pLeft.dy);
+    headPath.lineTo(pRight.dx, pRight.dy);
+    headPath.close();
 
-    canvas.drawPath(path, arrowPaint);
+    final headPaint = Paint()
+      ..color = color.withOpacity(0.95)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(headPath, headPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _BestMoveArrowPainter oldDelegate) =>
-      oldDelegate.from != from || oldDelegate.to != to || oldDelegate.color != color;
+  bool shouldRepaint(covariant _MoveArrowPainter oldDelegate) =>
+      oldDelegate.start != start || oldDelegate.end != end || oldDelegate.color != color;
 }

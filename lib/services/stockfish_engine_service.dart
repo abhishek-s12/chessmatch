@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import '../models/chess_game_state.dart';
 import '../models/chess_piece.dart';
 import '../models/engine_evaluation.dart';
@@ -40,6 +41,26 @@ enum BotDifficulty {
     required this.blunderRate,
     required this.noiseRange,
   });
+}
+
+/// Top-level Isolate worker function for multi-threaded background Stockfish search
+Map<String, dynamic> _isolateSearchWorker(Map<String, dynamic> args) {
+  final fen = args['fen'] as String;
+  final depth = args['depth'] as int;
+
+  final game = ChessGameState();
+  game.loadFen(fen);
+
+  final service = StockfishEngineService();
+  final eval = service.evaluatePositionSync(game, depth: depth);
+
+  return {
+    'scoreCp': eval.scoreCp,
+    'bestMove': eval.bestMove,
+    'depth': eval.depth,
+    'nodes': eval.nodes,
+    'pvLine': eval.pvLine,
+  };
 }
 
 class StockfishEngineService {
@@ -153,106 +174,15 @@ class StockfishEngineService {
     return score;
   }
 
-  /// Quiescence search to eliminate horizon effect on tactical captures
-  int _quiescence(ChessGameState game, int alpha, int beta, bool isMaximizing, int maxQDepth) {
-    int standPat = evaluateBoard(game);
-
-    if (maxQDepth <= 0) return standPat;
-
-    if (isMaximizing) {
-      if (standPat >= beta) return beta;
-      if (alpha < standPat) alpha = standPat;
-
-      final captureMoves = _getCaptures(game);
-      _orderMoves(game, captureMoves);
-
-      for (final move in captureMoves) {
-        final origSrc = game.pieceAtPos(move.from);
-        final origDst = game.pieceAtPos(move.to);
-
-        game.board[move.to.row][move.to.col] = origSrc;
-        game.board[move.from.row][move.from.col] = null;
-
-        final score = _quiescence(game, alpha, beta, false, maxQDepth - 1);
-
-        game.board[move.from.row][move.from.col] = origSrc;
-        game.board[move.to.row][move.to.col] = origDst;
-
-        if (score >= beta) return beta;
-        if (score > alpha) alpha = score;
-      }
-      return alpha;
-    } else {
-      if (standPat <= alpha) return alpha;
-      if (beta > standPat) beta = standPat;
-
-      final captureMoves = _getCaptures(game);
-      _orderMoves(game, captureMoves);
-
-      for (final move in captureMoves) {
-        final origSrc = game.pieceAtPos(move.from);
-        final origDst = game.pieceAtPos(move.to);
-
-        game.board[move.to.row][move.to.col] = origSrc;
-        game.board[move.from.row][move.from.col] = null;
-
-        final score = _quiescence(game, alpha, beta, true, maxQDepth - 1);
-
-        game.board[move.from.row][move.from.col] = origSrc;
-        game.board[move.to.row][move.to.col] = origDst;
-
-        if (score <= alpha) return alpha;
-        if (score < beta) beta = score;
-      }
-      return beta;
-    }
-  }
-
-  List<ChessMove> _getCaptures(ChessGameState game) {
-    final moves = game.generateAllLegalMoves();
-    return moves.where((m) => game.pieceAtPos(m.to) != null || m.isEnPassant).toList();
-  }
-
-  /// Move ordering using MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
-  void _orderMoves(ChessGameState game, List<ChessMove> moves, [ChessMove? hashMove]) {
-    moves.sort((a, b) {
-      if (hashMove != null) {
-        if (a == hashMove) return -1;
-        if (b == hashMove) return 1;
-      }
-
-      final targetA = game.pieceAtPos(a.to);
-      final targetB = game.pieceAtPos(b.to);
-      final srcA = game.pieceAtPos(a.from);
-      final srcB = game.pieceAtPos(b.from);
-
-      int scoreA = 0;
-      int scoreB = 0;
-
-      if (targetA != null && srcA != null) {
-        scoreA = targetA.value * 10 - srcA.value;
-      }
-      if (targetB != null && srcB != null) {
-        scoreB = targetB.value * 10 - srcB.value;
-      }
-
-      // Promotions priority
-      if (a.promotion != null) scoreA += 800;
-      if (b.promotion != null) scoreB += 800;
-
-      return scoreB.compareTo(scoreA);
-    });
-  }
-
-  /// Evaluates position and calculates best move using Alpha-Beta pruning + Transposition Tables
+  /// Evaluates position asynchronously in a background Isolate via compute()
   Future<EngineEvaluation> evaluatePosition(ChessGameState game, {int depth = 4}) async {
-    final currentFen = game.generateFen();
+    final fen = game.generateFen();
 
-    // 1. Check Opening Book
-    final bookMove = _openingBook.findBookMove(currentFen);
+    // Fast-path opening book lookup on UI thread
+    final bookMove = _openingBook.findBookMove(fen);
     if (bookMove != null) {
       return EngineEvaluation(
-        scoreCp: 0.2,
+        scoreCp: game.turn == PieceColor.white ? 0.3 : -0.3,
         bestMove: bookMove.moveUci,
         depth: depth,
         nodes: 1,
@@ -260,38 +190,63 @@ class StockfishEngineService {
       );
     }
 
+    try {
+      final res = await compute(_isolateSearchWorker, {
+        'fen': fen,
+        'depth': depth,
+      });
+
+      return EngineEvaluation(
+        scoreCp: res['scoreCp'] as double,
+        bestMove: res['bestMove'] as String,
+        depth: res['depth'] as int,
+        nodes: res['nodes'] as int,
+        pvLine: List<String>.from(res['pvLine'] as List),
+      );
+    } catch (e) {
+      // Fallback to synchronous evaluation if isolate cannot spawn
+      return evaluatePositionSync(game, depth: depth);
+    }
+  }
+
+  /// Synchronous evaluation method (used inside Isolate or unit test fallbacks)
+  EngineEvaluation evaluatePositionSync(ChessGameState game, {int depth = 4}) {
     final moves = game.generateAllLegalMoves();
     if (moves.isEmpty) {
       if (game.isKingInCheck(game.turn)) {
         return EngineEvaluation(
-          mateInMoves: game.turn == PieceColor.white ? -1 : 1,
+          scoreCp: game.turn == PieceColor.white ? -999.0 : 999.0,
           bestMove: '--',
           depth: depth,
+          nodes: 0,
         );
       }
-      return const EngineEvaluation(
-        scoreCp: 0.0,
-        bestMove: '--',
-        depth: 0,
+      return EngineEvaluation(scoreCp: 0.0, bestMove: '--', depth: depth, nodes: 0);
+    }
+
+    // Check Transposition Table
+    final ttKey = '${game.generateFen()}_$depth';
+    if (_transpositionTable.containsKey(ttKey)) {
+      final entry = _transpositionTable[ttKey]!;
+      return EngineEvaluation(
+        scoreCp: entry.score / 100.0,
+        bestMove: entry.bestMove?.uci ?? moves.first.uci,
+        depth: entry.depth,
+        nodes: 50,
       );
     }
 
-    // Check TT for full search
-    final ttKey = currentFen;
-    final ttEntry = _transpositionTable[ttKey];
-    ChessMove? hashMove = ttEntry?.bestMove;
+    _orderMoves(game, moves);
 
     ChessMove? bestMove;
     int bestScore = game.turn == PieceColor.white ? -100000 : 100000;
     int nodes = 0;
 
-    _orderMoves(game, moves, hashMove);
-
     for (final move in moves) {
-      // Simulate move
       final origSrc = game.pieceAtPos(move.from);
       final origDst = game.pieceAtPos(move.to);
 
+      // Make move
       game.board[move.to.row][move.to.col] = origSrc;
       game.board[move.from.row][move.from.col] = null;
 
@@ -345,14 +300,14 @@ class StockfishEngineService {
     );
   }
 
-  /// Calculates a move for Bot Match based on selected difficulty ELO
+  /// Calculates a move for Bot Match in background isolate (0 UI freezing)
   Future<ChessMove> getBotMove(ChessGameState game, BotDifficulty difficulty) async {
     final moves = game.generateAllLegalMoves();
     if (moves.isEmpty) return const ChessMove(from: BoardPosition(0, 0), to: BoardPosition(0, 0));
 
     final currentFen = game.generateFen();
 
-    // Check opening book first
+    // Check opening book first (instant)
     final bookMove = _openingBook.findBookMove(currentFen);
     if (bookMove != null) {
       final match = moves.firstWhere(
@@ -365,11 +320,10 @@ class StockfishEngineService {
     final random = math.Random();
     // Simulate blunder for lower difficulties
     if (random.nextDouble() < difficulty.blunderRate && moves.length > 1) {
-      // Pick random legal move or second/third best
       return moves[random.nextInt(moves.length)];
     }
 
-    // Evaluate position with target depth
+    // Evaluate position with target depth via background compute() Isolate
     final eval = await evaluatePosition(game, depth: difficulty.depth);
     if (eval.bestMove != '--') {
       final parsed = ChessMove.fromUci(eval.bestMove);
@@ -447,6 +401,70 @@ class StockfishEngineService {
       }
       return minEval;
     }
+  }
+
+  int _quiescence(ChessGameState game, int alpha, int beta, bool isMaximizing, int qDepth) {
+    final standPat = evaluateBoard(game);
+    if (qDepth == 0) return standPat;
+
+    if (isMaximizing) {
+      if (standPat >= beta) return beta;
+      if (standPat > alpha) alpha = standPat;
+    } else {
+      if (standPat <= alpha) return alpha;
+      if (standPat < beta) beta = standPat;
+    }
+
+    final captures = game.generateAllLegalMoves().where((m) => m.isCapture).toList();
+    _orderMoves(game, captures);
+
+    for (final move in captures) {
+      final origSrc = game.pieceAtPos(move.from);
+      final origDst = game.pieceAtPos(move.to);
+
+      game.board[move.to.row][move.to.col] = origSrc;
+      game.board[move.from.row][move.from.col] = null;
+
+      final score = _quiescence(game, alpha, beta, !isMaximizing, qDepth - 1);
+
+      game.board[move.from.row][move.from.col] = origSrc;
+      game.board[move.to.row][move.to.col] = origDst;
+
+      if (isMaximizing) {
+        if (score >= beta) return beta;
+        if (score > alpha) alpha = score;
+      } else {
+        if (score <= alpha) return alpha;
+        if (score < beta) beta = score;
+      }
+    }
+
+    return isMaximizing ? alpha : beta;
+  }
+
+  void _orderMoves(ChessGameState game, List<ChessMove> moves) {
+    moves.sort((a, b) {
+      int scoreA = 0;
+      int scoreB = 0;
+
+      if (a.isCapture) {
+        final victim = game.pieceAtPos(a.to);
+        final attacker = game.pieceAtPos(a.from);
+        if (victim != null && attacker != null) {
+          scoreA = (victim.value * 10) - attacker.value;
+        }
+      }
+
+      if (b.isCapture) {
+        final victim = game.pieceAtPos(b.to);
+        final attacker = game.pieceAtPos(b.from);
+        if (victim != null && attacker != null) {
+          scoreB = (victim.value * 10) - attacker.value;
+        }
+      }
+
+      return scoreB.compareTo(scoreA);
+    });
   }
 
   void stop() {
