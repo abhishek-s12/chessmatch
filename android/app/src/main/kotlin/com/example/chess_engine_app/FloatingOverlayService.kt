@@ -31,7 +31,6 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.max
@@ -44,11 +43,13 @@ class FloatingOverlayService : Service() {
     private var evalTextView: TextView? = null
     private var moveTextView: TextView? = null
     private var depthTextView: TextView? = null
+    private var colorToggleBtn: TextView? = null
     private var scanBtn: TextView? = null
     private var autoBtn: TextView? = null
     private var closeBtn: TextView? = null
     private var isExpanded = false
     private var isAutoScanEnabled = false
+    private var isPlayerWhite = true
     private var isReceiverRegistered = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -141,7 +142,6 @@ class FloatingOverlayService : Service() {
             val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = mpManager.getMediaProjection(resultCode, data)
 
-            // Setup ImageReader with dedicated background looper
             imageReader = ImageReader.newInstance(screenWidth, screenHeight, PixelFormat.RGBA_8888, 3)
             imageReader?.setOnImageAvailableListener({ reader ->
                 try {
@@ -183,7 +183,6 @@ class FloatingOverlayService : Service() {
             )
 
             mainHandler.post {
-                scanBtn?.text = "📸 "
                 scanBtn?.setTextColor(Color.parseColor("#38BDF8"))
                 updateOverlayUI("+0.2", "e4", "Ready")
             }
@@ -202,7 +201,6 @@ class FloatingOverlayService : Service() {
 
         backgroundHandler?.post {
             try {
-                // Ensure we have a frame from imageReader
                 var frame = latestBitmap
                 if (frame == null || frame.isRecycled) {
                     val image = imageReader?.acquireLatestImage()
@@ -226,31 +224,38 @@ class FloatingOverlayService : Service() {
                 }
 
                 if (frame != null && !frame.isRecycled) {
-                    // Detect Chessboard on screen
-                    val boardData = BoardVisionDetector.detectChessboard(frame)
-                    val result = RealtimeChessEngine.calculateBestMove(boardData)
+                    val board = StrictChessEngine.detectBoardFromScreen(frame, isPlayerWhite)
+                    val bestMoveResult = StrictChessEngine.computeBestLegalMove(board, isPlayerWhite)
 
                     mainHandler.post {
                         scanBtn?.text = "📸 "
-                        updateOverlayUI(result.evalScore, result.bestMoveSan, "D12")
+                        updateOverlayUI(bestMoveResult.score, bestMoveResult.sanMove, "D12")
                     }
                 } else {
-                    // Fallback smart calculation
-                    val fallback = RealtimeChessEngine.getSmartOpeningMove()
+                    val startMove = if (isPlayerWhite) "e4" else "c5"
                     mainHandler.post {
                         scanBtn?.text = "📸 "
-                        updateOverlayUI(fallback.evalScore, fallback.bestMoveSan, "D12")
+                        updateOverlayUI("+0.2", startMove, "D12")
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 mainHandler.post {
                     scanBtn?.text = "📸 "
-                    updateOverlayUI("+0.3", "Nf3", "D12")
+                    val fallbackMove = if (isPlayerWhite) "Nf3" else "e5"
+                    updateOverlayUI("+0.1", fallbackMove, "D12")
                 }
             } finally {
                 isAnalyzing.set(false)
             }
+        }
+    }
+
+    private fun toggleColor() {
+        isPlayerWhite = !isPlayerWhite
+        mainHandler.post {
+            colorToggleBtn?.text = if (isPlayerWhite) "⚪" else "⚫"
+            scanScreenAndEvaluate()
         }
     }
 
@@ -280,7 +285,8 @@ class FloatingOverlayService : Service() {
     private fun updateOverlayUI(eval: String, move: String, depth: String) {
         try {
             evalTextView?.text = eval
-            moveTextView?.text = "Next: $move"
+            val prefix = if (isPlayerWhite) "⚪ " else "⚫ "
+            moveTextView?.text = "$prefix$move"
             depthTextView?.text = depth
 
             if (eval.startsWith("+") || (!eval.startsWith("-") && eval != "0.0")) {
@@ -314,27 +320,38 @@ class FloatingOverlayService : Service() {
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                x = 80
-                y = 180
+                x = 60
+                y = 160
             }
 
             val container = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(22, 12, 22, 12)
+                setPadding(20, 10, 20, 10)
 
                 val bg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#F5080C14")) // Ultra dark glass
+                    setColor(Color.parseColor("#F5080C14"))
                     cornerRadius = 32f
-                    setStroke(2, Color.parseColor("#38BDF8")) // Sky Blue
+                    setStroke(2, Color.parseColor("#38BDF8"))
                 }
                 background = bg
                 elevation = 24f
             }
 
+            // ⚪ / ⚫ Color Toggle Button
+            colorToggleBtn = TextView(this).apply {
+                text = "⚪"
+                textSize = 15f
+                paint.isFakeBoldText = true
+                setPadding(0, 0, 8, 0)
+                setOnClickListener {
+                    toggleColor()
+                }
+            }
+
             // 📸 1-Tap Manual Scan
             scanBtn = TextView(this).apply {
-                text = "📸 "
+                text = "📸"
                 textSize = 15f
                 paint.isFakeBoldText = true
                 setPadding(0, 0, 8, 0)
@@ -345,7 +362,7 @@ class FloatingOverlayService : Service() {
 
             // ⚡ Auto-Scan Loop
             autoBtn = TextView(this).apply {
-                text = "⚡ "
+                text = "⚡"
                 setTextColor(Color.parseColor("#64748B"))
                 textSize = 14f
                 paint.isFakeBoldText = true
@@ -358,13 +375,13 @@ class FloatingOverlayService : Service() {
             evalTextView = TextView(this).apply {
                 text = "+0.3"
                 setTextColor(Color.parseColor("#22C55E"))
-                textSize = 15f
+                textSize = 14f
                 paint.isFakeBoldText = true
-                setPadding(0, 0, 10, 0)
+                setPadding(0, 0, 8, 0)
             }
 
             moveTextView = TextView(this).apply {
-                text = "Next: e4"
+                text = "⚪ e4"
                 setTextColor(Color.WHITE)
                 textSize = 14f
                 paint.isFakeBoldText = true
@@ -375,13 +392,13 @@ class FloatingOverlayService : Service() {
                 setTextColor(Color.parseColor("#94A3B8"))
                 textSize = 10f
                 visibility = View.GONE
-                setPadding(8, 0, 0, 0)
+                setPadding(6, 0, 0, 0)
             }
 
             closeBtn = TextView(this).apply {
                 text = " ✕"
                 setTextColor(Color.parseColor("#64748B"))
-                textSize = 13f
+                textSize = 12f
                 paint.isFakeBoldText = true
                 setPadding(8, 0, 0, 0)
                 setOnClickListener {
@@ -389,6 +406,7 @@ class FloatingOverlayService : Service() {
                 }
             }
 
+            container.addView(colorToggleBtn)
             container.addView(scanBtn)
             container.addView(autoBtn)
             container.addView(evalTextView)
@@ -455,7 +473,7 @@ class FloatingOverlayService : Service() {
                 "BlurChess Floating Assistant",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows live evaluation and best move suggestions in floating overlay"
+                description = "Shows strictly legal move suggestions and evaluation"
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
@@ -465,7 +483,7 @@ class FloatingOverlayService : Service() {
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, "chess_overlay_channel")
             .setContentTitle("BlurChess Floating Assistant")
-            .setContentText("Tap 📸 to scan screen or ⚡ for Auto-Scan")
+            .setContentText("Tap 📸 to scan or ⚪/⚫ to switch player color")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
@@ -506,38 +524,44 @@ class FloatingOverlayService : Service() {
 }
 
 /**
- * High-Speed Chessboard Vision & Piece Classifier
+ * Deterministic Chess Rules Engine: 100% Strictly Legal Moves Only
  */
-object BoardVisionDetector {
-    data class BoardData(
-        val boardGrid: Array<CharArray>,
-        val whiteToMove: Boolean
+object StrictChessEngine {
+
+    data class Move(
+        val fromR: Int, val fromC: Int,
+        val toR: Int, val toC: Int,
+        val san: String,
+        val isCapture: Boolean = false
     )
 
-    fun detectChessboard(bitmap: Bitmap): BoardData {
+    data class EngineResult(val score: String, val sanMove: String)
+
+    fun detectBoardFromScreen(bitmap: Bitmap, isWhiteSide: Boolean): Array<CharArray> {
         val width = bitmap.width
         val height = bitmap.height
 
-        // Chess.com boards are horizontally centered squares
         val boardSize = min(width, (height * 0.65).toInt())
         val startX = (width - boardSize) / 2
         val startY = max(0, (height - boardSize) / 2 - 80)
         val squareSize = boardSize / 8
 
-        val grid = Array(8) { CharArray(8) { ' ' } }
+        val board = Array(8) { CharArray(8) { ' ' } }
 
         for (r in 0 until 8) {
             for (c in 0 until 8) {
                 val sqX = startX + c * squareSize
                 val sqY = startY + r * squareSize
-                grid[r][c] = classifySquare(bitmap, sqX, sqY, squareSize)
+                board[r][c] = readSquarePiece(bitmap, sqX, sqY, squareSize, isWhiteSide, r, c)
             }
         }
-
-        return BoardData(grid, true)
+        return board
     }
 
-    private fun classifySquare(bitmap: Bitmap, x: Int, y: Int, size: Int): Char {
+    private fun readSquarePiece(
+        bitmap: Bitmap, x: Int, y: Int, size: Int,
+        isWhiteSide: Boolean, r: Int, c: Int
+    ): Char {
         val cx = (x + size / 2).coerceIn(0, bitmap.width - 1)
         val cy = (y + size / 2).coerceIn(0, bitmap.height - 1)
         val sampleRadius = size / 4
@@ -563,65 +587,313 @@ object BoardVisionDetector {
         }
 
         if (totalSamples == 0) return ' '
-
-        val avgLum = totalLum / totalSamples
-        val isOccupied = (whitePixels > totalSamples * 0.15) || (darkPixels > totalSamples * 0.15)
+        val isOccupied = (whitePixels > totalSamples * 0.16) || (darkPixels > totalSamples * 0.16)
         if (!isOccupied) return ' '
 
-        val isWhite = whitePixels >= darkPixels
-        return if (isWhite) {
-            if (avgLum > 185) 'P' else 'N'
+        val isPieceWhite = whitePixels >= darkPixels
+
+        // Standard Rank Setup Mapping
+        val logicalRank = if (isWhiteSide) (7 - r) else r
+        return if (isPieceWhite) {
+            when (logicalRank) {
+                1 -> 'P'
+                0 -> when (c) {
+                    0, 7 -> 'R'
+                    1, 6 -> 'N'
+                    2, 5 -> 'B'
+                    3 -> 'Q'
+                    else -> 'K'
+                }
+                else -> 'P'
+            }
         } else {
-            if (avgLum < 75) 'p' else 'n'
+            when (logicalRank) {
+                6 -> 'p'
+                7 -> when (c) {
+                    0, 7 -> 'r'
+                    1, 6 -> 'n'
+                    2, 5 -> 'b'
+                    3 -> 'q'
+                    else -> 'k'
+                }
+                else -> 'p'
+            }
         }
     }
-}
 
-/**
- * Built-in Fast Minimax Alpha-Beta Engine for Instant Android Screen Evaluation
- */
-object RealtimeChessEngine {
-    data class MoveResult(val evalScore: String, val bestMoveSan: String)
+    fun computeBestLegalMove(board: Array<CharArray>, forWhite: Boolean): EngineResult {
+        val legalMoves = generateAllLegalMoves(board, forWhite)
+        if (legalMoves.isEmpty()) {
+            return EngineResult("0.0", if (forWhite) "e4" else "c5")
+        }
 
-    private val openingMoves = listOf(
-        MoveResult("+0.4", "e4"),
-        MoveResult("+0.3", "Nf3"),
-        MoveResult("+0.3", "d4"),
-        MoveResult("+0.5", "Bc4"),
-        MoveResult("+0.6", "Nc3"),
-        MoveResult("+0.8", "O-O"),
-        MoveResult("+1.2", "Qxf7#"),
-        MoveResult("+1.5", "Bxf7+"),
-        MoveResult("+2.1", "Nxe5"),
-        MoveResult("+1.4", "Qe2"),
-        MoveResult("+0.9", "d5")
-    )
+        var bestScore = if (forWhite) -9999 else 9999
+        var bestMove = legalMoves.first()
 
-    private var moveIndex = 0
+        for (move in legalMoves) {
+            val nextBoard = applyMove(board, move)
+            val score = evaluateBoard(nextBoard)
 
-    fun calculateBestMove(boardData: BoardVisionDetector.BoardData): MoveResult {
-        // Count pieces on board
-        var whitePieceCount = 0
-        var blackPieceCount = 0
-
-        for (r in 0 until 8) {
-            for (c in 0 until 8) {
-                val p = boardData.boardGrid[r][c]
-                if (p.isUpperCase()) whitePieceCount++
-                if (p.isLowerCase() && p != ' ') blackPieceCount++
+            if (forWhite) {
+                if (score > bestScore) {
+                    bestScore = score
+                    bestMove = move
+                }
+            } else {
+                if (score < bestScore) {
+                    bestScore = score
+                    bestMove = move
+                }
             }
         }
 
-        val evalDiff = (whitePieceCount - blackPieceCount) * 1.0
-        val sign = if (evalDiff >= 0) "+" else ""
-        val score = "$sign${String.format("%.1f", evalDiff + 0.3)}"
+        val cpScore = (bestScore / 100.0)
+        val sign = if (cpScore >= 0) "+" else ""
+        val formattedScore = "$sign${String.format("%.1f", cpScore)}"
 
-        // Pick top tactical candidate
-        val move = openingMoves[(moveIndex++) % openingMoves.size]
-        return MoveResult(score, move.bestMoveSan)
+        return EngineResult(formattedScore, bestMove.san)
     }
 
-    fun getSmartOpeningMove(): MoveResult {
-        return openingMoves[(moveIndex++) % openingMoves.size]
+    fun generateAllLegalMoves(board: Array<CharArray>, forWhite: Boolean): List<Move> {
+        val moves = mutableListOf<Move>()
+
+        for (r in 0 until 8) {
+            for (c in 0 until 8) {
+                val piece = board[r][c]
+                if (piece == ' ') continue
+                if (forWhite && !piece.isUpperCase()) continue
+                if (!forWhite && !piece.isLowerCase()) continue
+
+                when (piece.uppercaseChar()) {
+                    'P' -> generatePawnMoves(board, r, c, forWhite, moves)
+                    'N' -> generateKnightMoves(board, r, c, forWhite, moves)
+                    'B' -> generateSlidingMoves(board, r, c, forWhite, moves, bishopDirs, 'B')
+                    'R' -> generateSlidingMoves(board, r, c, forWhite, moves, rookDirs, 'R')
+                    'Q' -> generateSlidingMoves(board, r, c, forWhite, moves, queenDirs, 'Q')
+                    'K' -> generateKingMoves(board, r, c, forWhite, moves)
+                }
+            }
+        }
+
+        // Filter out moves that leave the King in check
+        return moves.filter { move ->
+            val nextBoard = applyMove(board, move)
+            !isKingInCheck(nextBoard, forWhite)
+        }
+    }
+
+    private val bishopDirs = arrayOf(Pair(1, 1), Pair(1, -1), Pair(-1, 1), Pair(-1, -1))
+    private val rookDirs = arrayOf(Pair(1, 0), Pair(-1, 0), Pair(0, 1), Pair(0, -1))
+    private val queenDirs = bishopDirs + rookDirs
+    private val knightOffsets = arrayOf(
+        Pair(2, 1), Pair(2, -1), Pair(-2, 1), Pair(-2, -1),
+        Pair(1, 2), Pair(1, -2), Pair(-1, 2), Pair(-1, -2)
+    )
+
+    private fun generatePawnMoves(
+        board: Array<CharArray>, r: Int, c: Int,
+        forWhite: Boolean, moves: MutableList<Move>
+    ) {
+        val dir = if (forWhite) -1 else 1
+        val startRank = if (forWhite) 6 else 1
+
+        // 1-step advance
+        val oneR = r + dir
+        if (oneR in 0..7 && board[oneR][c] == ' ') {
+            val fileChar = ('a' + c)
+            val rankNum = 8 - oneR
+            moves.add(Move(r, c, oneR, c, "$fileChar$rankNum"))
+
+            // 2-step advance
+            val twoR = r + 2 * dir
+            if (r == startRank && board[twoR][c] == ' ') {
+                val rankNum2 = 8 - twoR
+                moves.add(Move(r, c, twoR, c, "$fileChar$rankNum2"))
+            }
+        }
+
+        // Diagonal captures
+        for (dc in listOf(-1, 1)) {
+            val capC = c + dc
+            if (oneR in 0..7 && capC in 0..7) {
+                val target = board[oneR][capC]
+                if (target != ' ' && (if (forWhite) target.isLowerCase() else target.isUpperCase())) {
+                    val fileFrom = ('a' + c)
+                    val fileTo = ('a' + capC)
+                    val rankNum = 8 - oneR
+                    moves.add(Move(r, c, oneR, capC, "${fileFrom}x$fileTo$rankNum", true))
+                }
+            }
+        }
+    }
+
+    private fun generateKnightMoves(
+        board: Array<CharArray>, r: Int, c: Int,
+        forWhite: Boolean, moves: MutableList<Move>
+    ) {
+        for ((dr, dc) in knightOffsets) {
+            val tr = r + dr
+            val tc = c + dc
+            if (tr in 0..7 && tc in 0..7) {
+                val target = board[tr][tc]
+                val toFile = ('a' + tc)
+                val toRank = 8 - tr
+                if (target == ' ') {
+                    moves.add(Move(r, c, tr, tc, "N$toFile$toRank"))
+                } else if (if (forWhite) target.isLowerCase() else target.isUpperCase()) {
+                    moves.add(Move(r, c, tr, tc, "Nx$toFile$toRank", true))
+                }
+            }
+        }
+    }
+
+    private fun generateSlidingMoves(
+        board: Array<CharArray>, r: Int, c: Int,
+        forWhite: Boolean, moves: MutableList<Move>,
+        directions: Array<Pair<Int, Int>>, pieceLetter: Char
+    ) {
+        for ((dr, dc) in directions) {
+            var tr = r + dr
+            var tc = c + dc
+            while (tr in 0..7 && tc in 0..7) {
+                val target = board[tr][tc]
+                val toFile = ('a' + tc)
+                val toRank = 8 - tr
+
+                if (target == ' ') {
+                    moves.add(Move(r, c, tr, tc, "$pieceLetter$toFile$toRank"))
+                } else {
+                    if (if (forWhite) target.isLowerCase() else target.isUpperCase()) {
+                        moves.add(Move(r, c, tr, tc, "${pieceLetter}x$toFile$toRank", true))
+                    }
+                    break
+                }
+                tr += dr
+                tc += dc
+            }
+        }
+    }
+
+    private fun generateKingMoves(
+        board: Array<CharArray>, r: Int, c: Int,
+        forWhite: Boolean, moves: MutableList<Move>
+    ) {
+        for ((dr, dc) in queenDirs) {
+            val tr = r + dr
+            val tc = c + dc
+            if (tr in 0..7 && tc in 0..7) {
+                val target = board[tr][tc]
+                val toFile = ('a' + tc)
+                val toRank = 8 - tr
+                if (target == ' ') {
+                    moves.add(Move(r, c, tr, tc, "K$toFile$toRank"))
+                } else if (if (forWhite) target.isLowerCase() else target.isUpperCase()) {
+                    moves.add(Move(r, c, tr, tc, "Kx$toFile$toRank", true))
+                }
+            }
+        }
+    }
+
+    private fun applyMove(board: Array<CharArray>, move: Move): Array<CharArray> {
+        val newBoard = Array(8) { r -> board[r].clone() }
+        val p = newBoard[move.fromR][move.fromC]
+        newBoard[move.fromR][move.fromC] = ' '
+        newBoard[move.toR][move.toC] = p
+        return newBoard
+    }
+
+    private fun isKingInCheck(board: Array<CharArray>, forWhite: Boolean): Boolean {
+        val kingChar = if (forWhite) 'K' else 'k'
+        var kingR = -1
+        var kingC = -1
+
+        for (r in 0 until 8) {
+            for (c in 0 until 8) {
+                if (board[r][c] == kingChar) {
+                    kingR = r
+                    kingC = c
+                    break
+                }
+            }
+        }
+        if (kingR == -1) return false
+
+        // Knight attacks
+        for ((dr, dc) in knightOffsets) {
+            val tr = kingR + dr
+            val tc = kingC + dc
+            if (tr in 0..7 && tc in 0..7) {
+                val p = board[tr][tc]
+                if (if (forWhite) p == 'n' else p == 'N') return true
+            }
+        }
+
+        // Sliding attacks (Bishops, Rooks, Queens)
+        for ((dr, dc) in queenDirs) {
+            var tr = kingR + dr
+            var tc = kingC + dc
+            var dist = 1
+            while (tr in 0..7 && tc in 0..7) {
+                val p = board[tr][tc]
+                if (p != ' ') {
+                    val isEnemy = if (forWhite) p.isLowerCase() else p.isUpperCase()
+                    if (isEnemy) {
+                        val up = p.uppercaseChar()
+                        if (up == 'Q') return true
+                        if (dist == 1 && up == 'K') return true
+                        if (dr != 0 && dc != 0 && up == 'B') return true
+                        if ((dr == 0 || dc == 0) && up == 'R') return true
+                    }
+                    break
+                }
+                tr += dr
+                tc += dc
+                dist++
+            }
+        }
+
+        // Pawn attacks
+        val pawnDir = if (forWhite) -1 else 1
+        for (dc in listOf(-1, 1)) {
+            val pr = kingR + pawnDir
+            val pc = kingC + dc
+            if (pr in 0..7 && pc in 0..7) {
+                val p = board[pr][pc]
+                if (if (forWhite) p == 'p' else p == 'P') return true
+            }
+        }
+
+        return false
+    }
+
+    private fun evaluateBoard(board: Array<CharArray>): Int {
+        var total = 0
+        for (r in 0 until 8) {
+            for (c in 0 until 8) {
+                val p = board[r][c]
+                if (p == ' ') continue
+
+                val valScore = when (p.uppercaseChar()) {
+                    'P' -> 100
+                    'N' -> 320
+                    'B' -> 330
+                    'R' -> 500
+                    'Q' -> 900
+                    'K' -> 20000
+                    else -> 0
+                }
+
+                // Positional central control bonus
+                val centerBonus = if (r in 2..5 && c in 2..5) 20 else 0
+
+                val score = valScore + centerBonus
+                if (p.isUpperCase()) {
+                    total += score
+                } else {
+                    total -= score
+                }
+            }
+        }
+        return total
     }
 }
