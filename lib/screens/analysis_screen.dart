@@ -73,7 +73,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.cardDark,
+        backgroundColor: const Color(0xFF262421),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Load / Export FEN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: Column(
@@ -85,12 +85,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Paste FEN position string here...',
-                hintStyle: const TextStyle(color: AppTheme.textMuted),
+                hintStyle: const TextStyle(color: Colors.white54),
                 filled: true,
-                fillColor: AppTheme.surfaceDark,
+                fillColor: const Color(0xFF1E1C18),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFF334155)),
+                  borderSide: const BorderSide(color: Color(0xFF3B3935)),
                 ),
               ),
             ),
@@ -104,11 +104,11 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 const SnackBar(content: Text('FEN copied to clipboard!')),
               );
             },
-            child: const Text('Copy FEN', style: TextStyle(color: AppTheme.primaryNeon)),
+            child: const Text('Copy FEN', style: TextStyle(color: Color(0xFF81B64C), fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.secondaryNeon,
+              backgroundColor: const Color(0xFF81B64C),
               foregroundColor: Colors.black,
             ),
             onPressed: () {
@@ -119,7 +119,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               }
               Navigator.pop(ctx);
             },
-            child: const Text('Load Position'),
+            child: const Text('Load Position', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -131,15 +131,28 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final game = context.watch<ChessGameState>();
 
     return Scaffold(
+      backgroundColor: const Color(0xFF1E1C18),
       appBar: AppBar(
-        title: const Text(
-          'CHESS ENGINE ANALYZER',
-          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.5, fontSize: 15),
+        backgroundColor: const Color(0xFF262421),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.psychology, color: Color(0xFF81B64C), size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Analysis Board',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+            ),
+          ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.insights),
-            tooltip: 'Game Review',
+            icon: const Icon(Icons.diamond, color: Color(0xFF38BDF8)),
+            tooltip: 'Diamond Game Review',
             onPressed: () {
               Navigator.push(
                 context,
@@ -148,12 +161,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.swap_vert),
+            icon: const Icon(Icons.swap_vert, color: Colors.white),
             tooltip: 'Flip Board',
             onPressed: () => game.toggleBoardFlip(),
           ),
           IconButton(
-            icon: const Icon(Icons.code),
+            icon: const Icon(Icons.code, color: Colors.white),
             tooltip: 'FEN Import/Export',
             onPressed: _showFenDialog,
           ),
@@ -189,6 +202,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   EvaluationBarWidget(
                     evaluation: _currentEval,
                     isFlipped: game.isFlipped,
+                    height: 330.0,
                   ),
                   const SizedBox(width: 8),
 
@@ -209,7 +223,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               MoveHistoryWidget(sanHistory: game.sanHistory),
               const SizedBox(height: 12),
 
-              // Board Control Toolbar
+              // Board Control Toolbar (Scrollable to prevent overflow)
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -235,7 +249,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     const SizedBox(width: 8),
                     _buildToolButton(
                       icon: Icons.lightbulb,
-                      label: 'Best Move',
+                      label: 'Play Best',
                       onTap: () {
                         if (_currentEval.bestMove != '--') {
                           final move = ChessMove.fromUci(_currentEval.bestMove);
@@ -248,8 +262,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     ),
                     const SizedBox(width: 8),
                     _buildToolButton(
-                      icon: Icons.insights,
-                      label: 'Review',
+                      icon: Icons.diamond_outlined,
+                      label: 'Game Review',
                       onTap: () {
                         Navigator.push(
                           context,
@@ -278,14 +292,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: AppTheme.cardDark,
+          color: const Color(0xFF262421),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF334155)),
+          border: Border.all(color: const Color(0xFF3B3935)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: AppTheme.primaryNeon),
+            Icon(icon, size: 16, color: const Color(0xFF81B64C)),
             const SizedBox(width: 6),
             Text(
               label,

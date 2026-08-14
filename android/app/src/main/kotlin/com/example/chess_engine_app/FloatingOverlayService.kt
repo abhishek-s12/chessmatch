@@ -40,6 +40,7 @@ class FloatingOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var floatingView: View? = null
+    private var expandedCardView: LinearLayout? = null
     private var evalBadge: TextView? = null
     private var classBadge: TextView? = null
     private var moveTextView: TextView? = null
@@ -50,9 +51,11 @@ class FloatingOverlayService : Service() {
     private var nextBtn: TextView? = null
     private var liveBadge: TextView? = null
     private var closeBtn: TextView? = null
+    private var coachBubbleText: TextView? = null
 
     private var isPlayerWhite = true
     private var isReceiverRegistered = false
+    private var isExpanded = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var backgroundThread: HandlerThread? = null
@@ -190,7 +193,7 @@ class FloatingOverlayService : Service() {
             startContinuousMoveTracking()
 
             mainHandler.post {
-                liveBadge?.setTextColor(Color.parseColor("#22C55E"))
+                liveBadge?.setTextColor(Color.parseColor("#81B64C"))
                 val firstMove = liveGameState.getBestMoveFor(isPlayerWhite)
                 updateOverlayUI(firstMove.score, firstMove.moveSan, firstMove.fromSquare, firstMove.toSquare, firstMove.pieceName, firstMove.badge)
             }
@@ -275,9 +278,9 @@ class FloatingOverlayService : Service() {
     private fun updateColorBadgeUI() {
         colorBadge?.let { badge ->
             badge.text = if (isPlayerWhite) "♔ W" else "♚ B"
-            badge.setTextColor(if (isPlayerWhite) Color.parseColor("#0F172A") else Color.WHITE)
+            badge.setTextColor(if (isPlayerWhite) Color.parseColor("#1E1C18") else Color.WHITE)
             val bg = GradientDrawable().apply {
-                setColor(if (isPlayerWhite) Color.WHITE else Color.parseColor("#1E293B"))
+                setColor(if (isPlayerWhite) Color.WHITE else Color.parseColor("#262421"))
                 cornerRadius = 16f
                 setStroke(2, if (isPlayerWhite) Color.parseColor("#E2E8F0") else Color.parseColor("#475569"))
             }
@@ -323,14 +326,16 @@ class FloatingOverlayService : Service() {
             moveTextView?.text = moveSan
 
             val isAdvantage = eval.startsWith("+") || (!eval.startsWith("-") && eval != "0.0")
-            evalBadge?.setTextColor(if (isAdvantage) Color.parseColor("#4ADE80") else Color.parseColor("#F87171"))
+            evalBadge?.setTextColor(if (isAdvantage) Color.parseColor("#81B64C") else Color.parseColor("#FA412D"))
 
             val evalBg = GradientDrawable().apply {
-                setColor(if (isAdvantage) Color.parseColor("#2022C55E") else Color.parseColor("#20EF4444"))
+                setColor(if (isAdvantage) Color.parseColor("#2581B64C") else Color.parseColor("#25FA412D"))
                 cornerRadius = 14f
-                setStroke(1, if (isAdvantage) Color.parseColor("#4022C55E") else Color.parseColor("#40EF4444"))
+                setStroke(1, if (isAdvantage) Color.parseColor("#5081B64C") else Color.parseColor("#50FA412D"))
             }
             evalBadge?.background = evalBg
+
+            coachBubbleText?.text = "Coach: Play $pieceName to $toSq ($moveSan) for optimal piece activity."
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -359,18 +364,33 @@ class FloatingOverlayService : Service() {
                 y = 120
             }
 
+            val rootLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+
+            // High-End Chess.com Dark Glass Container
             val container = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(16, 8, 16, 8)
+                setPadding(14, 8, 14, 8)
 
                 val bg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#F6080C14"))
+                    setColor(Color.parseColor("#F51E1C18"))
                     cornerRadius = 34f
-                    setStroke(2, Color.parseColor("#38BDF8"))
+                    setStroke(2, Color.parseColor("#81B64C")) // Chess.com Green Border
                 }
                 background = bg
                 elevation = 32f
+            }
+
+            // Coach Avatar Icon
+            val coachIcon = TextView(this).apply {
+                text = "👨‍🏫"
+                textSize = 14f
+                setPadding(2, 0, 8, 0)
+                setOnClickListener {
+                    toggleExpandedView()
+                }
             }
 
             // ♔ W / ♚ B Perspective Switcher
@@ -388,14 +408,14 @@ class FloatingOverlayService : Service() {
             // ↻ SYNC Button
             syncBtn = TextView(this).apply {
                 text = "↻ SYNC"
-                setTextColor(Color.parseColor("#38BDF8"))
+                setTextColor(Color.parseColor("#81B64C"))
                 textSize = 11f
                 paint.isFakeBoldText = true
                 setPadding(10, 6, 10, 6)
                 val syncBg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#1A38BDF8"))
+                    setColor(Color.parseColor("#2081B64C"))
                     cornerRadius = 14f
-                    setStroke(1, Color.parseColor("#4038BDF8"))
+                    setStroke(1, Color.parseColor("#5081B64C"))
                 }
                 background = syncBg
                 setOnClickListener {
@@ -406,14 +426,14 @@ class FloatingOverlayService : Service() {
             // ▶ NEXT Button
             nextBtn = TextView(this).apply {
                 text = "▶ NEXT"
-                setTextColor(Color.parseColor("#A855F7"))
+                setTextColor(Color.parseColor("#38BDF8"))
                 textSize = 11f
                 paint.isFakeBoldText = true
                 setPadding(10, 6, 10, 6)
                 val nextBg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#1AA855F7"))
+                    setColor(Color.parseColor("#2038BDF8"))
                     cornerRadius = 14f
-                    setStroke(1, Color.parseColor("#40A855F7"))
+                    setStroke(1, Color.parseColor("#5038BDF8"))
                 }
                 background = nextBg
                 setOnClickListener {
@@ -424,7 +444,7 @@ class FloatingOverlayService : Service() {
             // ● LIVE Radar Tag
             liveBadge = TextView(this).apply {
                 text = "● LIVE"
-                setTextColor(Color.parseColor("#22C55E"))
+                setTextColor(Color.parseColor("#81B64C"))
                 textSize = 10f
                 paint.isFakeBoldText = true
                 setPadding(8, 0, 8, 0)
@@ -445,7 +465,7 @@ class FloatingOverlayService : Service() {
             // Score Pill Badge (+0.4)
             evalBadge = TextView(this).apply {
                 text = "+0.3"
-                setTextColor(Color.parseColor("#4ADE80"))
+                setTextColor(Color.parseColor("#81B64C"))
                 textSize = 13f
                 paint.isFakeBoldText = true
                 setPadding(10, 4, 10, 4)
@@ -490,12 +510,13 @@ class FloatingOverlayService : Service() {
                 }
             }
 
-            val space1 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
-            val space2 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
-            val space3 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
-            val space4 = View(this).apply { layoutParams = LinearLayout.LayoutParams(8, 1) }
+            val space1 = View(this).apply { layoutParams = LinearLayout.LayoutParams(6, 1) }
+            val space2 = View(this).apply { layoutParams = LinearLayout.LayoutParams(6, 1) }
+            val space3 = View(this).apply { layoutParams = LinearLayout.LayoutParams(6, 1) }
+            val space4 = View(this).apply { layoutParams = LinearLayout.LayoutParams(6, 1) }
             val space5 = View(this).apply { layoutParams = LinearLayout.LayoutParams(6, 1) }
 
+            container.addView(coachIcon)
             container.addView(colorBadge)
             container.addView(space1)
             container.addView(syncBtn)
@@ -511,7 +532,38 @@ class FloatingOverlayService : Service() {
             container.addView(squareRouteBadge)
             container.addView(moveTextView)
             container.addView(closeBtn)
-            floatingView = container
+
+            // Expandable Coach Speech Bubble Card
+            expandedCardView = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(14, 10, 14, 10)
+                visibility = View.GONE
+                val bg = GradientDrawable().apply {
+                    setColor(Color.parseColor("#F5262421"))
+                    cornerRadius = 16f
+                    setStroke(1, Color.parseColor("#3B3935"))
+                }
+                background = bg
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 8, 0, 0)
+                }
+                layoutParams = lp
+            }
+
+            coachBubbleText = TextView(this).apply {
+                text = "Coach: Play Pawn to e4 for central control."
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                setPadding(4, 2, 4, 2)
+            }
+            expandedCardView?.addView(coachBubbleText)
+
+            rootLayout.addView(container)
+            rootLayout.addView(expandedCardView)
+            floatingView = rootLayout
 
             // Smooth Dragging
             container.setOnTouchListener(object : View.OnTouchListener {
@@ -555,6 +607,11 @@ class FloatingOverlayService : Service() {
         }
     }
 
+    private fun toggleExpandedView() {
+        isExpanded = !isExpanded
+        expandedCardView?.visibility = if (isExpanded) View.VISIBLE else View.GONE
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -571,7 +628,7 @@ class FloatingOverlayService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, "chess_overlay_channel")
-            .setContentTitle("BlurChess Grandmaster Assistant Active")
+            .setContentTitle("BlurChess Coach Assistant Active")
             .setContentText("Auto-detecting opponent moves & finding brilliant moves in real time")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -792,7 +849,6 @@ class LiveChessMatchTracker {
 
             val opponentMoves = generateLegalMoves(nextBoard, !isWhite)
             if (opponentMoves.isEmpty()) {
-                // Checkmate!
                 isMateInOne = true
                 bestMove = m
                 bestScore = if (isWhite) 10000 else -10000
@@ -806,7 +862,6 @@ class LiveChessMatchTracker {
                 bestScore = eval
                 bestMove = m
 
-                // Brilliant Sacrifice Detection (sacrificing Q/R/B/N into winning position)
                 val movedVal = getPieceValue(movedPiece)
                 val capturedVal = getPieceValue(capturedPiece)
                 val isSacrifice = movedVal > 300 && (capturedPiece == ' ' || capturedVal < movedVal)
