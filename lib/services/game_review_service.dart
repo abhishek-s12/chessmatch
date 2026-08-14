@@ -104,6 +104,8 @@ class GameReviewService {
       final isWhite = i % 2 == 0;
 
       tempGame.loadFen(fenBefore);
+      final movedPiece = tempGame.pieceAtPos(move.from);
+      final capturedPiece = tempGame.pieceAtPos(move.to);
 
       // 1. Calculate best move before player made move
       final evalBefore = await _engine.evaluatePosition(tempGame, depth: 3);
@@ -131,8 +133,6 @@ class GameReviewService {
 
         if (isTopEngine) {
           // Check for brilliant sacrifice: moved a valuable piece into capture or sacrificed material
-          final movedPiece = tempGame.pieceAtPos(move.from);
-          final capturedPiece = tempGame.pieceAtPos(move.to);
           final isSacrifice = movedPiece != null &&
               (movedPiece.type == PieceType.queen || movedPiece.type == PieceType.rook || movedPiece.type == PieceType.bishop || movedPiece.type == PieceType.knight) &&
               (capturedPiece == null || capturedPiece.value < movedPiece.value) &&
