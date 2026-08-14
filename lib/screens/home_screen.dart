@@ -41,7 +41,7 @@ class HomeScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             const Text(
-                              'CHESSMATCH',
+                              'BLURCHESS',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,

@@ -613,7 +613,7 @@ class ChessGameState extends ChangeNotifier {
     final buffer = StringBuffer();
 
     buffer.writeln('[Event "$event"]');
-    buffer.writeln('[Site "ChessMatch App"]');
+    buffer.writeln('[Site "BlurChess App"]');
     buffer.writeln('[Date "$dateStr"]');
     buffer.writeln('[White "$white"]');
     buffer.writeln('[Black "$black"]');

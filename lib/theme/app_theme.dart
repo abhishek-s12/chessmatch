@@ -2,8 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 enum BoardThemeType {
-  walnut(
-    name: 'Tournament Walnut',
+  green(
+    name: 'Official Green (Chess.com)',
+    lightSquare: Color(0xFFEBECD0),
+    darkSquare: Color(0xFF739552),
+    accentColor: Color(0xFF81B64C),
+    borderColor: Color(0xFF4B6E2C),
+    coordinateLight: Color(0xFF739552),
+    coordinateDark: Color(0xFFEBECD0),
+  ),
+  wood(
+    name: 'Walnut Wood (Chess.com)',
     lightSquare: Color(0xFFEEEED2),
     darkSquare: Color(0xFFB58863),
     accentColor: Color(0xFFF59E0B),
@@ -11,41 +20,32 @@ enum BoardThemeType {
     coordinateLight: Color(0xFFB58863),
     coordinateDark: Color(0xFFEEEED2),
   ),
-  emerald(
-    name: 'Official Emerald',
-    lightSquare: Color(0xFFEBECD0),
-    darkSquare: Color(0xFF739552),
-    accentColor: Color(0xFF22C55E),
-    borderColor: Color(0xFF3F6212),
-    coordinateLight: Color(0xFF739552),
-    coordinateDark: Color(0xFFEBECD0),
-  ),
-  obsidian(
-    name: 'Obsidian Glass',
-    lightSquare: Color(0xFF334155),
-    darkSquare: Color(0xFF0F172A),
+  glass(
+    name: 'Ice Glass (Chess.com)',
+    lightSquare: Color(0xFFC8D6E5),
+    darkSquare: Color(0xFF485460),
     accentColor: Color(0xFF38BDF8),
     borderColor: Color(0xFF1E293B),
-    coordinateLight: Color(0xFF64748B),
-    coordinateDark: Color(0xFF94A3B8),
+    coordinateLight: Color(0xFF485460),
+    coordinateDark: Color(0xFFC8D6E5),
   ),
-  cyber(
-    name: 'Cyberpunk Neo',
-    lightSquare: Color(0xFF1E293B),
-    darkSquare: Color(0xFF020617),
-    accentColor: Color(0xFF06B6D4),
-    borderColor: Color(0xFF06B6D4),
-    coordinateLight: Color(0xFF06B6D4),
-    coordinateDark: Color(0xFF67E8F9),
+  classic(
+    name: 'Classic Brown (Chess.com)',
+    lightSquare: Color(0xFFF0D9B5),
+    darkSquare: Color(0xFF9C6A43),
+    accentColor: Color(0xFFEAB308),
+    borderColor: Color(0xFF5C3A21),
+    coordinateLight: Color(0xFF9C6A43),
+    coordinateDark: Color(0xFFF0D9B5),
   ),
-  marble(
-    name: 'Alabaster Marble',
-    lightSquare: Color(0xFFF8FAFC),
-    darkSquare: Color(0xFF475569),
+  dark(
+    name: 'Night Charcoal (Chess.com)',
+    lightSquare: Color(0xFF4B4847),
+    darkSquare: Color(0xFF262423),
     accentColor: Color(0xFFA855F7),
-    borderColor: Color(0xFF334155),
-    coordinateLight: Color(0xFF475569),
-    coordinateDark: Color(0xFFF8FAFC),
+    borderColor: Color(0xFF161512),
+    coordinateLight: Color(0xFF8C8886),
+    coordinateDark: Color(0xFFCDC8C5),
   );
 
   final String name;
@@ -75,10 +75,10 @@ class AppTheme {
   static const Color cardDarkElevated = Color(0xFF243048);
 
   // Modern Accent Tones
-  static const Color primaryNeon = Color(0xFF38BDF8); // Electric Sky Blue
-  static const Color secondaryNeon = Color(0xFF22C55E); // Crisp Emerald
-  static const Color accentGold = Color(0xFFF59E0B); // Amber Gold
-  static const Color accentPurple = Color(0xFFA855F7); // Royalty Purple
+  static const Color primaryNeon = Color(0xFF38BDF8); // Sky Blue
+  static const Color secondaryNeon = Color(0xFF22C55E); // Emerald Green
+  static const Color accentGold = Color(0xFFF59E0B); // Gold
+  static const Color accentPurple = Color(0xFFA855F7); // Purple
   static const Color alertRed = Color(0xFFEF4444);
   static const Color textPrimary = Color(0xFFF8FAFC);
   static const Color textMuted = Color(0xFF94A3B8);
@@ -93,7 +93,7 @@ class AppTheme {
   static const Color missedWinCrimson = Color(0xFFDB5353);
   static const Color blunderRed = Color(0xFFFA412D);
 
-  static BoardThemeType activeBoardTheme = BoardThemeType.emerald;
+  static BoardThemeType activeBoardTheme = BoardThemeType.green;
 
   // Highlights
   static const Color highlightMove = Color(0x7338BDF8);
