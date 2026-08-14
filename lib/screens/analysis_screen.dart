@@ -12,6 +12,7 @@ import '../widgets/chess_board_widget.dart';
 import '../widgets/engine_analysis_panel.dart';
 import '../widgets/evaluation_bar_widget.dart';
 import '../widgets/move_history_widget.dart';
+import 'game_review_screen.dart';
 
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
@@ -59,6 +60,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           eval: eval.displayScore,
           bestMove: eval.bestMove,
           isWhite: game.turn == PieceColor.white,
+          depth: eval.depth,
         );
       }
     });
@@ -73,7 +75,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.cardDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Load / Export FEN', style: TextStyle(color: Colors.white)),
+        title: const Text('Load / Export FEN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -132,9 +134,19 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       appBar: AppBar(
         title: const Text(
           'CHESS ENGINE ANALYZER',
-          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.5, fontSize: 16),
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.5, fontSize: 15),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.insights),
+            tooltip: 'Game Review',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GameReviewScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.swap_vert),
             tooltip: 'Flip Board',
@@ -210,8 +222,16 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     },
                   ),
                   _buildToolButton(
+                    icon: Icons.undo,
+                    label: 'Undo',
+                    onTap: () {
+                      game.undoMove();
+                      _runEngineEvaluation();
+                    },
+                  ),
+                  _buildToolButton(
                     icon: Icons.lightbulb,
-                    label: 'Instant Move',
+                    label: 'Best Move',
                     onTap: () {
                       if (_currentEval.bestMove != '--') {
                         final move = ChessMove.fromUci(_currentEval.bestMove);
@@ -223,9 +243,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     },
                   ),
                   _buildToolButton(
-                    icon: Icons.fullscreen,
-                    label: 'Flip',
-                    onTap: () => game.toggleBoardFlip(),
+                    icon: Icons.insights,
+                    label: 'Review',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const GameReviewScreen()),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -245,7 +270,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: AppTheme.cardDark,
           borderRadius: BorderRadius.circular(12),
@@ -254,12 +279,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: AppTheme.primaryNeon),
+            Icon(icon, size: 16, color: AppTheme.primaryNeon),
             const SizedBox(width: 6),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),

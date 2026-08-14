@@ -37,6 +37,7 @@ class ChessGameState extends ChangeNotifier {
   bool get isFlipped => _isFlipped;
   List<ChessMove> get moveHistory => List.unmodifiable(_moveHistory);
   List<String> get sanHistory => List.unmodifiable(_sanHistory);
+  List<String> get fenHistory => List.unmodifiable(_fenHistory);
 
   void toggleBoardFlip() {
     _isFlipped = !_isFlipped;
@@ -552,5 +553,75 @@ class ChessGameState extends ChangeNotifier {
     final capture = pieceAtPos(move.to) != null || move.isEnPassant ? 'x' : '';
     final promo = move.promotion != null ? '=${move.promotion.toString().split('.').last[0].toUpperCase()}' : '';
     return '$prefix$capture${move.to.algebraic}$promo';
+  }
+
+  /// Reverts the most recent move
+  bool undoMove() {
+    if (_fenHistory.length <= 1) return false;
+    _fenHistory.removeLast();
+    final previousFen = _fenHistory.last;
+    
+    if (_moveHistory.isNotEmpty) _moveHistory.removeLast();
+    if (_sanHistory.isNotEmpty) _sanHistory.removeLast();
+
+    final prevMoves = List<ChessMove>.from(_moveHistory);
+    final prevSans = List<String>.from(_sanHistory);
+    final prevFens = List<String>.from(_fenHistory);
+
+    loadFen(previousFen);
+
+    _moveHistory.clear();
+    _moveHistory.addAll(prevMoves);
+    _sanHistory.clear();
+    _sanHistory.addAll(prevSans);
+    _fenHistory.clear();
+    _fenHistory.addAll(prevFens);
+
+    _lastMove = _moveHistory.isNotEmpty ? _moveHistory.last : null;
+    notifyListeners();
+    return true;
+  }
+
+  /// Reverts two consecutive moves (e.g. player's move + engine's reply)
+  bool undoTwoMoves() {
+    if (_fenHistory.length > 2) {
+      undoMove();
+      undoMove();
+      return true;
+    } else if (_fenHistory.length == 2) {
+      undoMove();
+      return true;
+    }
+    return false;
+  }
+
+  /// Generates standard PGN text with move SAN history
+  String generatePgn({
+    String white = 'White Player',
+    String black = 'Black Player',
+    String event = 'Casual Match',
+    String result = '*',
+  }) {
+    final now = DateTime.now();
+    final dateStr = '${now.year}.${now.month.toString().padLeft(2, '0')}.${now.day.toString().padLeft(2, '0')}';
+    final buffer = StringBuffer();
+
+    buffer.writeln('[Event "$event"]');
+    buffer.writeln('[Site "ChessMatch App"]');
+    buffer.writeln('[Date "$dateStr"]');
+    buffer.writeln('[White "$white"]');
+    buffer.writeln('[Black "$black"]');
+    buffer.writeln('[Result "$result"]');
+    buffer.writeln();
+
+    for (int i = 0; i < _sanHistory.length; i++) {
+      if (i % 2 == 0) {
+        final moveNum = (i ~/ 2) + 1;
+        buffer.write('$moveNum. ');
+      }
+      buffer.write('${_sanHistory[i]} ');
+    }
+    buffer.write(result);
+    return buffer.toString();
   }
 }

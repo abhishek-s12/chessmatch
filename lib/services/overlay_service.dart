@@ -57,6 +57,7 @@ class OverlayService {
     required String eval,
     required String bestMove,
     required bool isWhite,
+    int depth = 12,
   }) async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return;
@@ -66,6 +67,7 @@ class OverlayService {
         'eval': eval,
         'bestMove': bestMove,
         'isWhite': isWhite,
+        'depth': depth,
       });
     } catch (e) {
       debugPrint('Error updating overlay: $e');

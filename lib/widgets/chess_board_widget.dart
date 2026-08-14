@@ -2,32 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/chess_game_state.dart';
 import '../models/chess_piece.dart';
+import '../services/sound_service.dart';
 import '../theme/app_theme.dart';
 
 class ChessBoardWidget extends StatelessWidget {
   final String? bestMoveUci;
   final Function(ChessMove)? onMoveMade;
+  final bool interactive;
 
   const ChessBoardWidget({
     super.key,
     this.bestMoveUci,
     this.onMoveMade,
+    this.interactive = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final game = context.watch<ChessGameState>();
     final isFlipped = game.isFlipped;
+    final boardTheme = AppTheme.activeBoardTheme;
 
     return AspectRatio(
       aspectRatio: 1.0,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF334155), width: 3),
+          border: Border.all(color: boardTheme.borderColor.withOpacity(0.6), width: 3),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withOpacity(0.6),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -46,7 +50,7 @@ class ChessBoardWidget extends StatelessWidget {
                       final actualCol = isFlipped ? 7 - displayCol : displayCol;
                       final pos = BoardPosition(actualRow, actualCol);
                       return Expanded(
-                        child: _buildSquare(context, game, pos, displayRow, displayCol),
+                        child: _buildSquare(context, game, pos, displayRow, displayCol, boardTheme),
                       );
                     }),
                   ),
@@ -59,7 +63,7 @@ class ChessBoardWidget extends StatelessWidget {
 
             // Best Move Arrow / Overlay Indicator
             if (bestMoveUci != null && bestMoveUci!.length >= 4)
-              _buildBestMoveOverlay(game, isFlipped),
+              _buildBestMoveOverlay(game, isFlipped, boardTheme.accentColor),
           ],
         ),
       ),
@@ -72,6 +76,7 @@ class ChessBoardWidget extends StatelessWidget {
     BoardPosition pos,
     int displayRow,
     int displayCol,
+    BoardThemeType theme,
   ) {
     final isLight = (pos.row + pos.col) % 2 == 0;
     final isSelected = game.selectedSquare == pos;
@@ -83,32 +88,43 @@ class ChessBoardWidget extends StatelessWidget {
         game.isKingInCheck(game.turn);
 
     // Background color
-    Color squareColor = isLight ? AppTheme.lightSquareCyber : AppTheme.darkSquareCyber;
+    Color squareColor = isLight ? theme.lightSquare : theme.darkSquare;
     if (isSelected) {
-      squareColor = const Color(0xFF007799);
+      squareColor = theme.accentColor.withOpacity(0.65);
     } else if (isKingInCheck) {
-      squareColor = const Color(0xFF7F1D1D);
+      squareColor = const Color(0xFF991B1B);
     }
 
     return GestureDetector(
-      onTap: () {
-        final selected = game.selectedSquare;
-        if (selected != null) {
-          final move = game.legalMovesForSelected.firstWhere(
-            (m) => m.to == pos,
-            orElse: () => const ChessMove(
-              from: BoardPosition(-1, -1),
-              to: BoardPosition(-1, -1),
-            ),
-          );
-          if (move.from.row != -1) {
-            game.selectSquare(pos);
-            onMoveMade?.call(move);
-            return;
-          }
-        }
-        game.selectSquare(pos);
-      },
+      onTap: !interactive
+          ? null
+          : () {
+              final selected = game.selectedSquare;
+              if (selected != null) {
+                final move = game.legalMovesForSelected.firstWhere(
+                  (m) => m.to == pos,
+                  orElse: () => const ChessMove(
+                    from: BoardPosition(-1, -1),
+                    to: BoardPosition(-1, -1),
+                  ),
+                );
+                if (move.from.row != -1) {
+                  final isCap = game.pieceAtPos(pos) != null || move.isEnPassant;
+                  game.selectSquare(pos);
+                  if (isCap) {
+                    SoundService.playCapture();
+                  } else {
+                    SoundService.playMove();
+                  }
+                  if (game.isKingInCheck(game.turn)) {
+                    SoundService.playCheck();
+                  }
+                  onMoveMade?.call(move);
+                  return;
+                }
+              }
+              game.selectSquare(pos);
+            },
       child: Container(
         color: squareColor,
         child: Stack(
@@ -121,9 +137,9 @@ class ChessBoardWidget extends StatelessWidget {
                 height: piece != null ? 36 : 14,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: piece != null ? Colors.transparent : AppTheme.primaryNeon.withOpacity(0.6),
+                  color: piece != null ? Colors.transparent : theme.accentColor.withOpacity(0.6),
                   border: piece != null
-                      ? Border.all(color: AppTheme.primaryNeon, width: 3)
+                      ? Border.all(color: theme.accentColor, width: 3)
                       : null,
                 ),
               ),
@@ -139,7 +155,7 @@ class ChessBoardWidget extends StatelessWidget {
                   shadows: [
                     Shadow(
                       color: piece.color == PieceColor.white
-                          ? Colors.cyan.withOpacity(0.8)
+                          ? theme.accentColor.withOpacity(0.7)
                           : Colors.black.withOpacity(0.9),
                       blurRadius: piece.color == PieceColor.white ? 8 : 4,
                     ),
@@ -207,7 +223,7 @@ class ChessBoardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildBestMoveOverlay(ChessGameState game, bool isFlipped) {
+  Widget _buildBestMoveOverlay(ChessGameState game, bool isFlipped, Color accentColor) {
     final fromPos = BoardPosition.fromAlgebraic(bestMoveUci!.substring(0, 2));
     final toPos = BoardPosition.fromAlgebraic(bestMoveUci!.substring(2, 4));
     if (fromPos == null || toPos == null) return const SizedBox.shrink();
@@ -237,7 +253,7 @@ class ChessBoardWidget extends StatelessWidget {
             painter: _BestMoveArrowPainter(
               from: fromCenter,
               to: toCenter,
-              color: AppTheme.secondaryNeon,
+              color: accentColor,
             ),
           ),
         );

@@ -27,16 +27,23 @@ class FloatingOverlayService : Service() {
     private var floatingView: View? = null
     private var evalTextView: TextView? = null
     private var moveTextView: TextView? = null
+    private var depthTextView: TextView? = null
+    private var isExpanded = false
+    private var currentEval = "+0.0"
+    private var currentMove = "--"
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.example.chess_engine_app.UPDATE_EVAL") {
                 val eval = intent.getStringExtra("eval") ?: "+0.0"
                 val bestMove = intent.getStringExtra("bestMove") ?: "--"
-                val isWhite = intent.getBooleanExtra("isWhite", true)
+                val depth = intent.getIntExtra("depth", 12)
+                currentEval = eval
+                currentMove = bestMove
 
                 evalTextView?.text = eval
                 moveTextView?.text = "Next: $bestMove"
+                depthTextView?.text = "D$depth"
 
                 if (eval.startsWith("+") || (!eval.startsWith("-") && eval != "0.0")) {
                     evalTextView?.setTextColor(Color.parseColor("#4ADE80"))
@@ -93,12 +100,12 @@ class FloatingOverlayService : Service() {
             setPadding(32, 20, 32, 20)
             
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#E60F172A")) // Slate 900 translucent
+                setColor(Color.parseColor("#F00B0F19")) // Dark luxury translucent
                 cornerRadius = 40f
-                setStroke(3, Color.parseColor("#38BDF8")) // Cyan neon border
+                setStroke(3, Color.parseColor("#00F0FF")) // Neon Cyan
             }
             background = bg
-            elevation = 20f
+            elevation = 24f
         }
 
         evalTextView = TextView(this).apply {
@@ -116,16 +123,25 @@ class FloatingOverlayService : Service() {
             paint.isFakeBoldText = true
         }
 
+        depthTextView = TextView(this).apply {
+            text = "D12"
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 11f
+            setPadding(16, 0, 0, 0)
+        }
+
         container.addView(evalTextView)
         container.addView(moveTextView)
+        container.addView(depthTextView)
         floatingView = container
 
-        // Drag to move overlay anywhere on screen
+        // Drag and click handling
         container.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
             private var initialTouchX = 0f
             private var initialTouchY = 0f
+            private var isClick = false
 
             override fun onTouch(v: View?, event: MotionEvent?): Boolean {
                 when (event?.action) {
@@ -134,12 +150,25 @@ class FloatingOverlayService : Service() {
                         initialY = params.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
+                        isClick = true
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        params.x = initialX + (event.rawX - initialTouchX).toInt()
-                        params.y = initialY + (event.rawY - initialTouchY).toInt()
+                        val dx = (event.rawX - initialTouchX).toInt()
+                        val dy = (event.rawY - initialTouchY).toInt()
+                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                            isClick = false
+                        }
+                        params.x = initialX + dx
+                        params.y = initialY + dy
                         windowManager?.updateViewLayout(floatingView, params)
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (isClick) {
+                            isExpanded = !isExpanded
+                            depthTextView?.visibility = if (isExpanded) View.VISIBLE else View.GONE
+                        }
                         return true
                     }
                 }

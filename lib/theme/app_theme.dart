@@ -1,6 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+enum BoardThemeType {
+  cyberpunk(
+    name: 'Cyberpunk Neon',
+    lightSquare: Color(0xFF334155),
+    darkSquare: Color(0xFF0F172A),
+    accentColor: Color(0xFF00F0FF),
+    borderColor: Color(0xFF00F0FF),
+  ),
+  emerald(
+    name: 'Emerald Tournament',
+    lightSquare: Color(0xFFE2E8F0),
+    darkSquare: Color(0xFF059669),
+    accentColor: Color(0xFF10B981),
+    borderColor: Color(0xFF10B981),
+  ),
+  wood(
+    name: 'Classic Walnut',
+    lightSquare: Color(0xFFF0D9B5),
+    darkSquare: Color(0xFFB58863),
+    accentColor: Color(0xFFEAB308),
+    borderColor: Color(0xFF854D0E),
+  ),
+  midnight(
+    name: 'Midnight Obsidian',
+    lightSquare: Color(0xFF1E293B),
+    darkSquare: Color(0xFF090D16),
+    accentColor: Color(0xFF8B5CF6),
+    borderColor: Color(0xFF6366F1),
+  );
+
+  final String name;
+  final Color lightSquare;
+  final Color darkSquare;
+  final Color accentColor;
+  final Color borderColor;
+
+  const BoardThemeType({
+    required this.name,
+    required this.lightSquare,
+    required this.darkSquare,
+    required this.accentColor,
+    required this.borderColor,
+  });
+}
+
 class AppTheme {
   static const Color backgroundDark = Color(0xFF0B0F19);
   static const Color surfaceDark = Color(0xFF131B2E);
@@ -12,16 +57,9 @@ class AppTheme {
   static const Color alertRed = Color(0xFFEF4444);
   static const Color textMuted = Color(0xFF94A3B8);
 
-  // Board themes
-  static const Color lightSquareClassic = Color(0xFFE2E8F0);
-  static const Color darkSquareClassic = Color(0xFF475569);
+  static BoardThemeType activeBoardTheme = BoardThemeType.cyberpunk;
 
-  static const Color lightSquareCyber = Color(0xFF334155);
-  static const Color darkSquareCyber = Color(0xFF0F172A);
-
-  static const Color lightSquareEmerald = Color(0xFFE2E8F0);
-  static const Color darkSquareEmerald = Color(0xFF059669);
-
+  // Highlights
   static const Color highlightMove = Color(0x6600F0FF);
   static const Color highlightBestMove = Color(0x8010B981);
   static const Color highlightCheck = Color(0x80EF4444);

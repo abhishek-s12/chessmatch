@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'analysis_screen.dart';
+import 'bot_match_screen.dart';
+import 'game_review_screen.dart';
 import 'overlay_mode_screen.dart';
+import 'puzzle_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -12,11 +15,11 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // App Title & Tagline
+              // App Header & Branding
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -28,7 +31,7 @@ class HomeScreen extends StatelessWidget {
                           Icon(Icons.sports_esports, color: AppTheme.primaryNeon, size: 28),
                           SizedBox(width: 8),
                           Text(
-                            'CHESS ENGINE',
+                            'CHESSMATCH',
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
@@ -36,11 +39,20 @@ class HomeScreen extends StatelessWidget {
                               color: Colors.white,
                             ),
                           ),
+                          SizedBox(width: 6),
+                          Text(
+                            'v2.0',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.secondaryNeon,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        'Instant Move Analyzer & Android Floating Overlay',
+                        'AI Engine, Bot Matches, Game Review & Floating Overlay',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.textMuted,
@@ -60,17 +72,71 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 22),
 
-              // Hero Action Card 1: Interactive Analysis Board
+              // Hero Feature 1: Play vs AI Bots
               _buildFeatureCard(
                 context,
-                title: 'Live Engine Analysis',
-                subtitle: 'Analyze any position, calculate top engine lines, view eval bar, and test best moves.',
-                icon: Icons.analytics_outlined,
+                title: 'Play vs Engine Bots',
+                subtitle: 'Challenge 6 adaptive AI personalities (800 to 2600+ ELO) with chess clocks & takebacks.',
+                icon: Icons.smart_toy_outlined,
                 gradientColors: [const Color(0xFF0284C7), const Color(0xFF0369A1)],
                 accentColor: AppTheme.primaryNeon,
-                badgeText: 'REAL-TIME STOCKFISH',
+                badgeText: 'BOT MATCHES',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BotMatchScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+
+              // Hero Feature 2: Post-Game Review & Move Analysis
+              _buildFeatureCard(
+                context,
+                title: 'Post-Game Review & Accuracies',
+                subtitle: 'Deep analysis with move classification (Brilliant, Best, Blunder) and eval graph.',
+                icon: Icons.insights_outlined,
+                gradientColors: [const Color(0xFF7C3AED), const Color(0xFF6D28D9)],
+                accentColor: AppTheme.accentPurple,
+                badgeText: 'GAME REVIEW',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const GameReviewScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+
+              // Hero Feature 3: Tactical Puzzle Trainer
+              _buildFeatureCard(
+                context,
+                title: 'Tactical Puzzle Trainer',
+                subtitle: 'Sharpen your calculation with curated chess tactics (Mate in 1/2, Forks, Pins, Deflections).',
+                icon: Icons.extension_outlined,
+                gradientColors: [const Color(0xFFD97706), const Color(0xFFB45309)],
+                accentColor: Colors.amber,
+                badgeText: 'TACTICS DRILLS',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PuzzleScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 14),
+
+              // Hero Feature 4: Live Engine Analysis Board
+              _buildFeatureCard(
+                context,
+                title: 'Live Engine Analyzer',
+                subtitle: 'Analyze any position, calculate top engine lines, explore PV lines, and import/export FEN.',
+                icon: Icons.analytics_outlined,
+                gradientColors: [const Color(0xFF059669), const Color(0xFF047857)],
+                accentColor: AppTheme.secondaryNeon,
+                badgeText: 'STOCKFISH 2.0',
                 onTap: () {
                   Navigator.push(
                     context,
@@ -78,16 +144,16 @@ class HomeScreen extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Hero Action Card 2: Floating Overlay Mode
+              // Hero Feature 5: Floating Screen Overlay
               _buildFeatureCard(
                 context,
                 title: 'Floating Screen Overlay',
-                subtitle: 'Android floating bubble widget that stays on screen during review or bot practice.',
+                subtitle: 'Android floating pill assistant displaying live eval score and best move on top of third-party apps.',
                 icon: Icons.picture_in_picture_alt,
-                gradientColors: [const Color(0xFF059669), const Color(0xFF047857)],
-                accentColor: AppTheme.secondaryNeon,
+                gradientColors: [const Color(0xFF475569), const Color(0xFF334155)],
+                accentColor: const Color(0xFF94A3B8),
                 badgeText: 'ANDROID OVERLAY',
                 onTap: () {
                   Navigator.push(
@@ -96,25 +162,7 @@ class HomeScreen extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 16),
-
-              // Hero Action Card 3: Bot Practice & Puzzle Study
-              _buildFeatureCard(
-                context,
-                title: 'Engine Practice & Study',
-                subtitle: 'Play against offline engine difficulty levels and study grandmaster opening lines.',
-                icon: Icons.psychology_outlined,
-                gradientColors: [const Color(0xFF7C3AED), const Color(0xFF6D28D9)],
-                accentColor: AppTheme.accentPurple,
-                badgeText: 'OFFLINE STUDY',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AnalysisScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Fair Play & Ethics Footer Banner
               Container(
@@ -126,11 +174,11 @@ class HomeScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: const [
-                    Icon(Icons.info_outline, color: AppTheme.textMuted, size: 20),
+                    Icon(Icons.shield_outlined, color: AppTheme.textMuted, size: 20),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Designed for offline study, bot practice, and post-game review. Comply with fair play rules on online platforms.',
+                        'Designed for offline study, bot practice, and post-game review. Respect fair play guidelines across chess communities.',
                         style: TextStyle(fontSize: 11, color: AppTheme.textMuted, height: 1.3),
                       ),
                     ),
@@ -160,7 +208,7 @@ class HomeScreen extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: AppTheme.cardDark,
             borderRadius: BorderRadius.circular(20),
@@ -185,7 +233,7 @@ class HomeScreen extends StatelessWidget {
                       gradient: LinearGradient(colors: gradientColors),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(icon, color: Colors.white, size: 26),
+                    child: Icon(icon, color: Colors.white, size: 24),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -206,11 +254,11 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -219,7 +267,7 @@ class HomeScreen extends StatelessWidget {
               Text(
                 subtitle,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   color: AppTheme.textMuted,
                   height: 1.4,
                 ),

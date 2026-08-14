@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/sound_service.dart';
 import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,14 +13,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _engineDepth = 12.0;
   bool _autoAnalysis = true;
   bool _showArrows = true;
-  String _selectedTheme = 'Cyber Dark';
+  bool _soundEnabled = SoundService.soundEnabled;
+  bool _hapticsEnabled = SoundService.hapticsEnabled;
+  BoardThemeType _boardTheme = AppTheme.activeBoardTheme;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'SETTINGS & ENGINE CONFIG',
+          'SETTINGS & PREFERENCES',
           style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2, fontSize: 15),
         ),
       ),
@@ -27,6 +30,100 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Board Theme Selector
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Chessboard Theme & Styling',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: BoardThemeType.values.map((theme) {
+                        final isSel = _boardTheme == theme;
+                        return ChoiceChip(
+                          avatar: CircleAvatar(
+                            backgroundColor: theme.darkSquare,
+                            child: Icon(Icons.circle, color: theme.lightSquare, size: 14),
+                          ),
+                          label: Text(theme.name),
+                          selected: isSel,
+                          selectedColor: theme.accentColor.withOpacity(0.3),
+                          backgroundColor: AppTheme.surfaceDark,
+                          labelStyle: TextStyle(
+                            color: isSel ? theme.accentColor : Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          side: BorderSide(
+                            color: isSel ? theme.accentColor : const Color(0xFF334155),
+                            width: isSel ? 2 : 1,
+                          ),
+                          onSelected: (_) {
+                            setState(() {
+                              _boardTheme = theme;
+                              AppTheme.activeBoardTheme = theme;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Sound & Haptics
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Audio & Haptic Feedback',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Move Sound Effects', style: TextStyle(fontSize: 14)),
+                      subtitle: const Text('Plays clicks and captures during play', style: TextStyle(fontSize: 12)),
+                      value: _soundEnabled,
+                      activeColor: AppTheme.secondaryNeon,
+                      onChanged: (val) {
+                        setState(() {
+                          _soundEnabled = val;
+                          SoundService.soundEnabled = val;
+                        });
+                      },
+                    ),
+                    const Divider(color: Color(0xFF334155)),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Haptic Vibration Feedback', style: TextStyle(fontSize: 14)),
+                      subtitle: const Text('Tactile response on piece drops and checks', style: TextStyle(fontSize: 12)),
+                      value: _hapticsEnabled,
+                      activeColor: AppTheme.primaryNeon,
+                      onChanged: (val) {
+                        setState(() {
+                          _hapticsEnabled = val;
+                          SoundService.hapticsEnabled = val;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // Engine Search Depth
             Card(
               child: Padding(
@@ -74,7 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     const Text(
-                      'Higher depth provides deeper grandmaster calculation lines at the cost of slight battery/CPU usage.',
+                      'Higher depth provides deeper grandmaster calculation lines using alpha-beta & transposition tables.',
                       style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ],
@@ -91,7 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Visual & Board Customization',
+                      'Visual Aids & Analysis Options',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     const SizedBox(height: 12),
@@ -133,10 +230,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('About Chess Engine & Overlay App', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text('About ChessMatch Pro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     SizedBox(height: 8),
                     Text(
-                      'Version 1.0.0 (Pro Engine Edition)\nBuilt with Flutter & Android Native Overlay Services for chess analysis, engine training, and post-game study.',
+                      'Version 2.0.0 (Grandmaster Edition)\nBuilt with Flutter & Android Native Overlay Services for chess analysis, engine bot matches, post-game reviews, and tactical puzzle training.',
                       style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.4),
                     ),
                   ],
