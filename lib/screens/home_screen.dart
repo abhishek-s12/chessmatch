@@ -23,43 +23,45 @@ class HomeScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(Icons.sports_esports, color: AppTheme.primaryNeon, size: 28),
-                          SizedBox(width: 8),
-                          Text(
-                            'CHESSMATCH',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                              color: Colors.white,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.sports_esports, color: AppTheme.primaryNeon, size: 28),
+                            SizedBox(width: 8),
+                            Text(
+                              'CHESSMATCH',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'v2.0',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.secondaryNeon,
+                            SizedBox(width: 6),
+                            Text(
+                              'v2.0',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.secondaryNeon,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'AI Engine, Bot Matches, Game Review & Floating Overlay',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textMuted,
-                          fontWeight: FontWeight.w500,
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        const Text(
+                          'AI Engine, Bot Matches, Game Review & Floating Overlay',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.settings, color: AppTheme.textMuted),
