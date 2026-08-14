@@ -1,28 +1,30 @@
 import 'package:flutter/material.dart';
 import '../models/engine_evaluation.dart';
-import '../theme/app_theme.dart';
 
 class EvaluationBarWidget extends StatelessWidget {
   final EngineEvaluation evaluation;
   final bool isFlipped;
+  final double height;
 
   const EvaluationBarWidget({
     super.key,
     required this.evaluation,
     this.isFlipped = false,
+    this.height = 330.0,
   });
 
   @override
   Widget build(BuildContext context) {
     // Probability: 1.0 is full white win, 0.0 is full black win
-    final whiteProb = evaluation.winProbability;
+    final whiteProb = evaluation.winProbability.clamp(0.05, 0.95);
     final whiteHeightFactor = isFlipped ? (1.0 - whiteProb) : whiteProb;
 
     return Container(
-      width: 28,
+      width: 24,
+      height: height,
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF334155), width: 1.5),
         boxShadow: [
           BoxShadow(
