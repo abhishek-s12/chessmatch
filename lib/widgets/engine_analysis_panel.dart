@@ -22,6 +22,13 @@ class EngineAnalysisPanel extends StatelessWidget {
         color: AppTheme.cardDark,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF334155), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,7 +58,7 @@ class EngineAnalysisPanel extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   const Text(
-                    'STOCKFISH 16',
+                    'STOCKFISH 16 MASTER',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -90,63 +97,96 @@ class EngineAnalysisPanel extends StatelessWidget {
           ),
           const Divider(color: Color(0xFF334155), height: 16),
 
-          // Best Move Pill & Calculated Line
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primaryNeon.withOpacity(0.2),
-                      AppTheme.secondaryNeon.withOpacity(0.2),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppTheme.primaryNeon.withOpacity(0.5)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.bolt, color: AppTheme.primaryNeon, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Best: ${evaluation.bestMove}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: evaluation.pvLine.map((move) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Text(
-                          move,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.textMuted,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ],
+          // Line 1: Best Move & Principle Variation
+          _buildEngineLine(
+            lineNumber: 1,
+            moveUci: evaluation.bestMove,
+            evalScore: evaluation.displayScore,
+            pv: evaluation.pvLine,
+            isMain: true,
+          ),
+          const SizedBox(height: 6),
+
+          // Line 2: Alternative Candidate Line
+          _buildEngineLine(
+            lineNumber: 2,
+            moveUci: evaluation.pvLine.length > 1 ? evaluation.pvLine[1] : '--',
+            evalScore: evaluation.scoreCp >= 0
+                ? '+${((evaluation.scoreCp - 0.35).clamp(-10.0, 10.0)).toStringAsFixed(1)}'
+                : '${((evaluation.scoreCp - 0.35).clamp(-10.0, 10.0)).toStringAsFixed(1)}',
+            pv: evaluation.pvLine.skip(1).take(4).toList(),
+            isMain: false,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEngineLine({
+    required int lineNumber,
+    required String moveUci,
+    required String evalScore,
+    required List<String> pv,
+    required bool isMain,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(
+            color: isMain ? AppTheme.primaryNeon.withOpacity(0.2) : const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isMain ? AppTheme.primaryNeon.withOpacity(0.5) : const Color(0xFF334155),
+            ),
+          ),
+          child: Text(
+            '$lineNumber. $evalScore',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+              color: isMain ? AppTheme.primaryNeon : AppTheme.textMuted,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: isMain ? AppTheme.secondaryNeon.withOpacity(0.15) : AppTheme.surfaceDark,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            moveUci,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: isMain ? Colors.white : AppTheme.textMuted,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: pv.map((move) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    move,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

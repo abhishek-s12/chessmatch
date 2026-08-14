@@ -189,7 +189,7 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -198,20 +198,54 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
               decoration: BoxDecoration(
                 color: AppTheme.cardDark,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF334155)),
+                border: Border.all(color: AppTheme.primaryNeon, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryNeon.withOpacity(0.2),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
-              child: const Icon(Icons.analytics_outlined, size: 52, color: AppTheme.primaryNeon),
+              child: const Icon(Icons.analytics_outlined, size: 48, color: AppTheme.primaryNeon),
             ),
             const SizedBox(height: 20),
             const Text(
-              'No Game to Review Yet',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              'No Played Game to Review Yet',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Play a match against an engine bot or analyze moves in Live Analysis to generate deep game review reports.',
+              'Play a match against our Grandmaster Bot or load a legendary Master Game to experience full Diamond Game Review & AI Coach analysis!',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.4),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryNeon,
+                foregroundColor: Colors.black,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text(
+                'Review Paul Morphy\'s Opera Game (Immortal)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onPressed: _loadSampleMorphyGame,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Color(0xFF334155)),
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.smart_toy_outlined),
+              label: const Text('Play Bot Match First'),
+              onPressed: () => Navigator.pop(context),
             ),
           ],
         ),
@@ -663,6 +697,40 @@ class _GameReviewScreenState extends State<GameReviewScreen> {
         ],
       ),
     );
+  }
+
+  void _loadSampleMorphyGame() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final sampleGame = ChessGameState();
+    final uciMoves = [
+      'e2e4', 'e7e5', 'g1f3', 'd7d6', 'd2d4', 'c8g4', 'd4e5', 'g4f3',
+      'd1f3', 'd6e5', 'f1c4', 'g8f6', 'f3b3', 'd8e7', 'b1c3', 'c7c6',
+      'c1g5', 'b7b5', 'c3b5', 'c6b5', 'c4b5', 'b8d7', 'e1c1', 'a8d8',
+      'd1d7', 'd8d7', 'h1d1', 'e7e6', 'b5d7', 'f6d7', 'b3b8', 'd7b8',
+      'd1d8',
+    ];
+
+    for (final uci in uciMoves) {
+      final m = ChessMove.fromUci(uci);
+      if (m != null) {
+        sampleGame.makeMove(m);
+      }
+    }
+
+    final report = await _reviewService.analyzeGame(sampleGame);
+    if (mounted) {
+      setState(() {
+        _report = report;
+        _isLoading = false;
+        if (report.moves.isNotEmpty) {
+          _currentMoveIndex = 0;
+          _reviewGame.loadFen(report.moves.first.fenAfter);
+        }
+      });
+    }
   }
 }
 

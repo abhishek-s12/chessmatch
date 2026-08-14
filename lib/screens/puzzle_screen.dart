@@ -235,23 +235,95 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Description & Theme Tags
+              // Description & Coach Explanation
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: AppTheme.cardDark,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFF334155)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.lightbulb_outline, color: Colors.amber, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        puzzle.description,
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.school, color: AppTheme.secondaryNeon, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Tactical Motif: ${puzzle.theme}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.secondaryNeon,
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                          ),
+                          icon: const Icon(Icons.psychology, size: 16, color: AppTheme.primaryNeon),
+                          label: const Text(
+                            'Tactical Hint',
+                            style: TextStyle(fontSize: 12, color: AppTheme.primaryNeon, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: AppTheme.cardDark,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                title: Row(
+                                  children: [
+                                    const Icon(Icons.lightbulb, color: Colors.amber),
+                                    const SizedBox(width: 8),
+                                    Text(puzzle.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  ],
+                                ),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      puzzle.description,
+                                      style: const TextStyle(fontSize: 14, color: AppTheme.textMuted, height: 1.4),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.surfaceDark,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '💡 Coach Advice: Focus on attacking pieces with high value or unguarded king defenders.',
+                                        style: const TextStyle(fontSize: 12, color: AppTheme.secondaryNeon),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Got it!', style: TextStyle(color: AppTheme.primaryNeon)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      puzzle.description,
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.3),
                     ),
                   ],
                 ),
